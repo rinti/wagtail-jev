@@ -9,6 +9,7 @@ from wagtail.models import Page
 
 from wagtail_jev.classifier import PromptTemplates
 from wagtail_jev.models import JevTagField, JevTaggableMixin
+from wagtail_jev.quality import Level, Quality
 from wagtail_jev.panels import JevTagFieldPanel
 
 
@@ -47,6 +48,24 @@ class ArticlePage(JevTaggableMixin, Page):
                 criteria_false="{tag} does not describe the article's tone.",
             ),
             threshold=0.8,
+        ),
+    }
+    jev_qualities = {
+        "readability": Quality(
+            instructions="How easy is the text to understand?",
+            levels=(
+                Level("Easy", "A first-time reader follows every sentence."),
+                Level("Medium", "A reader needs to reread some sentences."),
+                Level("Hard", "The text assumes expert knowledge or is densely written."),
+            ),
+        ),
+        "mood": Quality(
+            instructions="What mood does the text leave the reader in?",
+            levels=(
+                Level("Sad", "The text dwells on loss or disappointment."),
+                Level("Neutral", "The text reports without emotional colour."),
+                Level("Happy", "The text celebrates or reassures."),
+            ),
         ),
     }
 

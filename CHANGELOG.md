@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Quality` and `Level` (`wagtail_jev.quality`): an ordered rubric Jev rates an Article on, declared in `JevTaggableMixin.jev_qualities`.
+- `page.jev_rate(*keys)` returns a `Rating` per Quality from one Jev request; `jev_quality(key)` returns the bound Quality.
 - `BoundTagField` (`wagtail_jev.tag_field`): one Tag field with settings resolved; `suggest(article)` runs the whole pipeline.
 - `JevTaggableMixin.jev_tag_field()` returns the bound Tag field for a page model.
 
 ### Changed
 
+- `Article.from_page()` and `Article.from_form_data()` no longer require a Tag field name; `from_form_data()` takes it as keyword `field_name`.
 - `jev_suggest_tags()` accepts only `client`; threshold and cap come from the Tag field.
 - `score_tags()` and `build_question()` require `templates`.
 - `JevTagField` lives in `wagtail_jev.tag_field`; `wagtail_jev.models` still exports it.

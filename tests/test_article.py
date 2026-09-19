@@ -30,6 +30,12 @@ def test_from_page_reads_existing_tags_of_the_named_field():
     page.save()
     assert Article.from_page(page, "tags").existing_tags == ("python",)
     assert Article.from_page(page, "feeling_tags").existing_tags == ()
+    assert Article.from_page(page).existing_tags == ()
+
+
+def test_from_form_data_without_a_tag_field_carries_no_existing_tags():
+    data = QueryDict("title=T&tags=django")
+    assert Article.from_form_data(ArticlePage, data) == Article(title="T", body="")
 
 
 @pytest.mark.django_db
@@ -47,12 +53,12 @@ def test_from_form_data_rebuilds_unsaved_stream_and_rich_text():
             "tags": "django, python",
         }
     )
-    article = Article.from_form_data(ArticlePage, "tags", data)
+    article = Article.from_form_data(ArticlePage, data, field_name="tags")
     assert article.title == "Python packaging"
     assert article.body == "How to build wheels\n\nSetup"
     assert article.existing_tags == ("django", "python")
 
 
 def test_from_form_data_tolerates_missing_fields():
-    article = Article.from_form_data(ArticlePage, "tags", QueryDict())
+    article = Article.from_form_data(ArticlePage, QueryDict(), field_name="tags")
     assert article == Article(title="", body="", existing_tags=())

@@ -30,7 +30,7 @@ def suggest(request):
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
-    article = Article.from_form_data(model, field_name, request.POST, request.FILES)
+    article = Article.from_form_data(model, request.POST, request.FILES, field_name=field_name)
     try:
         suggestions = tag_field.suggest(article)
     except TypeSafeError as exc:

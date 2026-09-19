@@ -23,24 +23,25 @@ class Article:
     existing_tags: tuple[str, ...] = ()
 
     @classmethod
-    def from_page(cls, page, field_name: str) -> "Article":
-        """Build from a saved page instance and the tags currently on ``field_name``."""
+    def from_page(cls, page, field_name: str | None = None) -> "Article":
+        """Build from a saved page instance and the tags currently on Tag field ``field_name``.
+
+        Without a Tag field (as when rating a Quality) the Article carries no existing tags.
+        """
         parts = (_value_to_text(getattr(page, name, None)) for name in _body_fields(page))
-        return cls(
-            title=page.title,
-            body=_join(parts),
-            existing_tags=tuple(tag.name for tag in getattr(page, field_name).all()),
-        )
+        existing = tuple(tag.name for tag in getattr(page, field_name).all()) if field_name else ()
+        return cls(title=page.title, body=_join(parts), existing_tags=existing)
 
     @classmethod
-    def from_form_data(cls, model, field_name: str, data, files=None) -> "Article":
-        """Build from the page edit form's raw POST data, so unsaved edits count."""
+    def from_form_data(cls, model, data, files=None, *, field_name: str | None = None) -> "Article":
+        """Build from the page edit form's raw POST data, so unsaved edits count.
+
+        ``field_name`` is the Tag field whose unsaved tags become the existing tags; omit
+        it to build an Article with none.
+        """
         parts = (_value_from_form(model, name, data, files or {}) for name in _body_fields(model))
-        return cls(
-            title=data.get("title", ""),
-            body=_join(parts),
-            existing_tags=tuple(parse_tags(data.get(field_name, ""))),
-        )
+        existing = tuple(parse_tags(data.get(field_name, ""))) if field_name else ()
+        return cls(title=data.get("title", ""), body=_join(parts), existing_tags=existing)
 
 
 def _body_fields(model_or_page) -> list[str]:

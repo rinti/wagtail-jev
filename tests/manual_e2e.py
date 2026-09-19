@@ -1,9 +1,10 @@
-"""Manual check of the editor button.
+"""Manual check of the editor button and the Python rating API.
 
     python tests/manual_e2e.py          # stubbed Jev, no network
     python tests/manual_e2e.py --live   # real Jev; reads WAGTAIL_API_KEY / TYPESAFE_API_KEY from .env
 
-Then log in at http://127.0.0.1:8765/admin/ as admin / pw and edit "Django tips".
+Prints the Ratings of the seeded page on every declared Quality, then serves the admin.
+Log in at http://127.0.0.1:8765/admin/ as admin / pw and edit "Django tips".
 """
 
 import os
@@ -46,7 +47,8 @@ if not LIVE:
     classifier.get_client = lambda: FakeClient(
         {"python": 0.93, "django": 0.71, "cooking": 0.05, "travel": 0.02,
          "finance": 0.1, "sport": 0.03, "calm": 0.9, "tense": 0.3, "joyful": 0.82,
-         "nostalgic": 0.1}
+         "nostalgic": 0.1},
+        distributions={"readability": [0.6, 0.3, 0.1], "mood": [0.05, 0.75, 0.2]},
     )
 
 db = Path("tests/test.db")
@@ -74,6 +76,12 @@ page = root.add_child(
         "prefetch_related, only(), annotate() and database indexes.</p>",
     )
 )
-print(f"Edit page: http://127.0.0.1:8765/admin/pages/{page.id}/edit/  (admin / pw)")
 print("Mode:", "LIVE Jev" if LIVE else "stubbed Jev")
+print("Ratings for", repr(page.title))
+for rating in page.jev_rate():
+    distribution = ", ".join(
+        f"{level.label} {round(p * 100)}%" for level, p in zip(rating.levels, rating.probabilities)
+    )
+    print(f"  {rating.key}: {rating.top_label} ({rating.percent}%)  [{distribution}]")
+print(f"Edit page: http://127.0.0.1:8765/admin/pages/{page.id}/edit/  (admin / pw)")
 execute_from_command_line(["manage", "runserver", "8765", "--noreload"])
