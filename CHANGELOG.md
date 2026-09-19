@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-19
+
 ### Added
 
 - `Quality` and `Level` (`wagtail_jev.quality`): an ordered rubric of two to ten levels Jev rates a text on, each level a short label for the editor and a concrete description for Jev. Declared under a key in `JevTaggableMixin.jev_qualities`; `Quality.label` is the display name and falls back to the key. Each Quality is one Score question.
@@ -60,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `jev_tag_pages` management command with `--field`, `--apply` and `--publish`.
 - `WAGTAIL_JEV_*` settings, including customizable prompt templates.
 
-[Unreleased]: https://github.com/rinti/wagtail-jev/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/rinti/wagtail-jev/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/rinti/wagtail-jev/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/rinti/wagtail-jev/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/rinti/wagtail-jev/releases/tag/v0.1.0
