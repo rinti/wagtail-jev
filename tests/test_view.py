@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from taggit.models import Tag
 
+from tests.conftest import contentstate
 from tests.testapp.models import FeelingTag
 
 
@@ -29,7 +30,7 @@ def test_suggest_uses_form_data_and_excludes_existing_tags(admin_client, tags, f
             "jev_model": "testapp.ArticlePage",
             "jev_field": "tags",
             "title": "Python packaging",
-            "intro": "<p>How to build wheels</p>",
+            "intro": contentstate("How to build wheels"),
             "body-count": "1",
             "body-0-type": "heading",
             "body-0-value": "Setup",

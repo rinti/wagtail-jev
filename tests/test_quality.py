@@ -4,7 +4,7 @@ from wagtail.rich_text import RichText
 
 from tests.conftest import FakeClient
 from tests.testapp.models import ArticlePage
-from wagtail_jev.article import Article
+from wagtail_jev.article import Article, Excerpt
 from wagtail_jev.quality import Level, Quality, rate
 
 ARTICLE = Article(title="Django ORM tips", body="select_related and friends")
@@ -126,3 +126,38 @@ def test_rate_uses_the_injected_client_without_closing_it():
     rating = ArticlePage.jev_quality("readability").rate(ARTICLE, client=client)
     assert rating.top_label == "Hard"
     assert client.closed is False
+
+
+def test_quality_label_falls_back_to_the_key():
+    assert ArticlePage.jev_quality("readability").label == "Readability"
+    assert ArticlePage.jev_quality("mood").label == "mood"
+
+
+def test_rating_carries_the_quality_label(fake_client):
+    fake_client(distributions={"readability": [0.7, 0.2, 0.1], "mood": [0.1, 0.1, 0.8]})
+    assert [(r.key, r.label) for r in _page().jev_rate()] == [("readability", "Readability"), ("mood", "mood")]
+
+
+def test_excerpt_state_is_the_excerpt_alone(fake_client):
+    client = fake_client(distributions={"readability": [0.7, 0.2, 0.1]})
+
+    rating = ArticlePage.jev_quality("readability").rate(Excerpt(text="Just the intro"))
+
+    assert rating.top_label == "Easy"
+    assert client.calls[0][0] == {"text": "Just the intro"}
+
+
+def test_excerpt_text_is_truncated_to_max_chars(fake_client, settings):
+    settings.WAGTAIL_JEV_MAX_CHARS = 5
+    client = fake_client(distributions={"readability": [0.7, 0.2, 0.1]})
+    ArticlePage.jev_quality("readability").rate(Excerpt(text="0123456789"))
+    assert client.calls[0][0] == {"text": "01234"}
+
+
+def test_blank_excerpt_makes_no_request_and_yields_no_ratings(fake_client):
+    client = fake_client(distributions={"readability": [0.7, 0.2, 0.1]})
+    blank = Excerpt(text=" \n")
+
+    assert rate([ArticlePage.jev_quality("readability")], blank) == []
+    assert ArticlePage.jev_quality("readability").rate(blank) is None
+    assert client.calls == []

@@ -3,14 +3,13 @@ from modelcluster.contrib.taggit import ClusterTaggableManager
 from modelcluster.fields import ParentalKey
 from taggit.models import ItemBase, TagBase, TaggedItemBase
 from wagtail import blocks
-from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
 
 from wagtail_jev.classifier import PromptTemplates
 from wagtail_jev.models import JevTagField, JevTaggableMixin
 from wagtail_jev.quality import Level, Quality
-from wagtail_jev.panels import JevRatingPanel, JevTagFieldPanel
+from wagtail_jev.panels import JevRatingFieldPanel, JevRatingPanel, JevTagFieldPanel
 
 
 class ArticleTag(TaggedItemBase):
@@ -52,6 +51,7 @@ class ArticlePage(JevTaggableMixin, Page):
     }
     jev_qualities = {
         "readability": Quality(
+            label="Readability",
             instructions="How easy is the text to understand?",
             levels=(
                 Level("Easy", "A first-time reader follows every sentence."),
@@ -70,8 +70,8 @@ class ArticlePage(JevTaggableMixin, Page):
     }
 
     content_panels = Page.content_panels + [
-        FieldPanel("intro"),
-        FieldPanel("body"),
+        JevRatingFieldPanel("intro", keys=["readability"]),
+        JevRatingFieldPanel("body", keys=["readability", "mood"]),
         JevTagFieldPanel("tags"),
         JevTagFieldPanel("feeling_tags"),
         JevRatingPanel(),

@@ -1,5 +1,13 @@
+import json
+
 import pytest
 from typesafe_sdk import NoulAnswer, Score, ScoreAnswer, SystemOneResponse, Usage
+
+
+def contentstate(text: str) -> str:
+    """What the Draftail rich text editor posts for one paragraph: contentstate JSON, not HTML."""
+    block = {"key": "a1b2c", "text": text, "type": "unstyled", "depth": 0, "inlineStyleRanges": [], "entityRanges": []}
+    return json.dumps({"blocks": [block], "entityMap": {}})
 
 
 class FakeClient:

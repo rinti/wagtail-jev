@@ -1,7 +1,8 @@
-"""The Article: what Jev reads about a page, built from a saved page or from unsaved form data.
+"""What Jev reads: the Article for a whole page, the Excerpt for one of its text fields.
 
-Both adapters produce the same value, so the "title is separate from body" rule,
-the ``jev_text_fields`` iteration and the text flattening live here and nowhere else.
+Both are built from a saved page or from unsaved form data, so the "title is separate
+from body" rule, the ``jev_text_fields`` iteration, the supported field types and the
+text flattening live here and nowhere else.
 """
 
 from __future__ import annotations
@@ -44,6 +45,50 @@ class Article:
         return cls(title=data.get("title", ""), body=_join(parts), existing_tags=existing)
 
 
+@dataclass(frozen=True)
+class Excerpt:
+    """The flattened text of one text field on a page, and nothing else: no title, no tags."""
+
+    text: str
+
+    @classmethod
+    def from_page(cls, page, field_name: str) -> "Excerpt":
+        """Build from the saved value of ``field_name``; raises :class:`LookupError` for a
+        field that is not one of the supported text field types."""
+        text_field(type(page), field_name)
+        return cls(text=_value_to_text(getattr(page, field_name, None)).strip())
+
+    @classmethod
+    def from_form_data(cls, model, field_name: str, data, files=None) -> "Excerpt":
+        """Build from the page edit form's raw POST data, so unsaved edits count.
+
+        Raises :class:`LookupError` for a field that is not one of the supported text
+        field types; a supported field missing from the form gives a blank Excerpt.
+        """
+        text_field(model, field_name)
+        return cls(text=_value_from_form(model, field_name, data, files or {}).strip())
+
+
+TEXT_FIELD_TYPES = (RichTextField, StreamField, models.CharField, models.TextField)
+
+
+def text_field(model, field_name: str):
+    """The model field ``field_name`` if it is a type the Article and Excerpt can read.
+
+    Raises :class:`LookupError` naming the field when it is unknown or of another type.
+    """
+    try:
+        field = model._meta.get_field(field_name)
+    except Exception:
+        raise LookupError(f"{model.__name__} has no field {field_name!r}") from None
+    if not isinstance(field, TEXT_FIELD_TYPES):
+        raise LookupError(
+            f"{model.__name__}.{field_name} is a {type(field).__name__}, not a text field Jev can read "
+            f"({', '.join(t.__name__ for t in TEXT_FIELD_TYPES)})"
+        )
+    return field
+
+
 def _body_fields(model_or_page) -> list[str]:
     return [f for f in model_or_page.jev_text_fields if f != "title"]
 
@@ -54,17 +99,21 @@ def _join(parts) -> str:
 
 def _value_from_form(model, name, data, files) -> str:
     try:
-        field = model._meta.get_field(name)
-    except Exception:
+        field = text_field(model, name)
+    except LookupError:
         return ""
     if isinstance(field, StreamField):
         if f"{name}-count" not in data:
             return ""
         value = field.stream_block.value_from_datadict(data, files, name)
-    elif isinstance(field, (RichTextField, models.CharField, models.TextField)):
-        value = data.get(name, "")
+    elif isinstance(field, RichTextField):
+        # The editor posts the rich text widget's own format (Draftail: contentstate
+        # JSON), not HTML, so let the widget turn it into HTML before flattening.
+        if not data.get(name):
+            return ""
+        value = field.formfield().widget.value_from_datadict(data, files, name)
     else:
-        return ""
+        value = data.get(name, "")
     return _value_to_text(value)
 
 

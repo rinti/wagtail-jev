@@ -12,7 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Quality` and `Level` (`wagtail_jev.quality`): an ordered rubric Jev rates an Article on, declared in `JevTaggableMixin.jev_qualities`.
 - `page.jev_rate(*keys)` returns a `Rating` per Quality from one Jev request; `jev_quality(key)` returns the bound Quality.
 - `JevRatingPanel` (`wagtail_jev.panels`): a "Rate with Jev" button that rates the editor's unsaved Article on all or some Qualities; Ratings are shown, never saved.
-- Admin endpoint `wagtail_jev:rate` returns the Ratings for the posted edit form.
+- `JevRatingFieldPanel` (`wagtail_jev.panels`): a `FieldPanel` for a `RichTextField`, `StreamField`, `CharField` or `TextField` with a "Rate with Jev" button that rates just that field's Excerpt on the given Quality keys. With one key the button names the Quality.
+- `Excerpt` (`wagtail_jev.article`): the flattened text of one field, built from a saved page (`Excerpt.from_page`) or from unsaved edit-form data (`Excerpt.from_form_data`). A bound Quality's `rate()` takes an Article or an Excerpt.
+- `Quality.label`: the display name editors see for a Quality; falls back to the key. Sent as `label` on every Rating.
+- Admin endpoint `wagtail_jev:rate` returns the Ratings for the posted edit form; with `jev_field` it rates that field's Excerpt instead of the Article.
 - `JevTaggableMixin.jev_bound_qualities(*keys)` returns the bound Qualities in declaration order.
 - `BoundTagField` (`wagtail_jev.tag_field`): one Tag field with settings resolved; `suggest(article)` runs the whole pipeline.
 - `JevTaggableMixin.jev_tag_field()` returns the bound Tag field for a page model.
@@ -23,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `jev_suggest_tags()` accepts only `client`; threshold and cap come from the Tag field.
 - `score_tags()` and `build_question()` require `templates`.
 - `JevTagField` lives in `wagtail_jev.tag_field`; `wagtail_jev.models` still exports it.
+
+### Fixed
+
+- Rich text posted from the editor is now read through the field's widget, so Draftail's contentstate JSON is flattened to text instead of being sent to Jev as-is. The `suggest` and `rate` endpoints expect a `RichTextField` value in the widget's format, as the editor posts it, not raw HTML.
 
 ### Removed
 

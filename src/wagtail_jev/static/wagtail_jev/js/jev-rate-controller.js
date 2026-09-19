@@ -1,7 +1,8 @@
 /**
- * Stimulus controller for the "Rate with Jev" button rendered by JevRatingPanel.
- * Posts the page edit form's current data to the rate endpoint and shows one line
- * per Rating: the most likely level and its percent, with every level's probability
+ * Stimulus controller for the "Rate with Jev" button rendered by JevRatingPanel and
+ * JevRatingFieldPanel. Posts the page edit form's current data to the rate endpoint,
+ * naming a field when the button belongs to one, and shows one line per Rating: the
+ * Quality's label, the most likely level and its percent, with every level's probability
  * behind a <details> element. Nothing is written to any form field.
  */
 class JevRateController extends window.StimulusModule.Controller {
@@ -9,6 +10,7 @@ class JevRateController extends window.StimulusModule.Controller {
   static values = {
     url: String,
     model: String,
+    field: { type: String, default: "" },
     keys: { type: String, default: "" },
     messages: { type: Object, default: {} },
   };
@@ -19,6 +21,7 @@ class JevRateController extends window.StimulusModule.Controller {
 
     const data = new FormData(form);
     data.set("jev_model", this.modelValue);
+    if (this.fieldValue) data.set("jev_field", this.fieldValue);
     this.keysValue
       .split(",")
       .filter(Boolean)
@@ -65,7 +68,7 @@ class JevRateController extends window.StimulusModule.Controller {
   renderRating(rating) {
     const details = document.createElement("details");
     const summary = document.createElement("summary");
-    summary.textContent = `${rating.key}: ${rating.label} (${this.percent(rating.probability)})`;
+    summary.textContent = `${rating.label}: ${rating.top_label} (${this.percent(rating.top_probability)})`;
     details.appendChild(summary);
 
     const list = document.createElement("ul");

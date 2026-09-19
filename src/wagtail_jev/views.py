@@ -4,7 +4,7 @@ from django.views.decorators.http import require_POST
 from typesafe_sdk import TypeSafeError
 from wagtail.admin.auth import require_admin_access
 
-from wagtail_jev.article import Article
+from wagtail_jev.article import Article, Excerpt
 from wagtail_jev.models import JevTaggableMixin
 from wagtail_jev.quality import Rating, rate as rate_qualities
 
@@ -53,13 +53,14 @@ def suggest(request):
 @require_admin_access
 @require_POST
 def rate(request):
-    """Rate the editor's current (unsaved) Article on the model's Qualities in one Jev request.
+    """Rate the editor's current (unsaved) text on the model's Qualities in one Jev request.
 
     Expects the page edit form's data plus ``jev_model`` (``app_label.ModelName``) and
-    zero or more ``jev_keys``; no keys means every declared Quality. Returns
-    ``{"ratings": [...]}`` in declaration order, each Rating with its key, the most likely
-    level's label and probability, and every level's label and probability. Ratings are
-    never written anywhere.
+    zero or more ``jev_keys``; no keys means every declared Quality. With ``jev_field``
+    the subject is that field's Excerpt, otherwise the whole Article. Returns
+    ``{"ratings": [...]}`` in declaration order, each Rating with its key and label, the
+    most likely level's label and probability, and every level's label and probability.
+    Ratings are never written anywhere.
     """
     model, error = _jev_model(request)
     if error:
@@ -70,9 +71,17 @@ def rate(request):
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
-    article = Article.from_form_data(model, request.POST, request.FILES)
+    field_name = request.POST.get("jev_field", "")
     try:
-        ratings = rate_qualities(qualities, article)
+        if field_name:
+            subject = Excerpt.from_form_data(model, field_name, request.POST, request.FILES)
+        else:
+            subject = Article.from_form_data(model, request.POST, request.FILES)
+    except LookupError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    try:
+        ratings = rate_qualities(qualities, subject)
     except TypeSafeError as exc:
         return JsonResponse({"error": str(exc)}, status=502)
 
@@ -82,8 +91,9 @@ def rate(request):
 def _rating_json(rating: Rating) -> dict:
     return {
         "key": rating.key,
-        "label": rating.top_label,
-        "probability": rating.top_probability,
+        "label": rating.label,
+        "top_label": rating.top_label,
+        "top_probability": rating.top_probability,
         "levels": [
             {"label": level.label, "probability": probability}
             for level, probability in zip(rating.levels, rating.probabilities)

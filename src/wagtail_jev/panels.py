@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.panels import FieldPanel, Panel
 
+from wagtail_jev.article import text_field
 from wagtail_jev.models import JevTaggableMixin
 
 
@@ -54,10 +55,7 @@ class JevRatingPanel(Panel):
         return kwargs
 
     def on_model_bound(self):
-        if not issubclass(self.model, JevTaggableMixin):
-            raise ImproperlyConfigured(
-                f"JevRatingPanel needs {self.model.__name__} to mix in JevTaggableMixin"
-            )
+        _check_rating_model(self)
         # Fail loudly here on a typo in ``keys``, not when an editor presses the button.
         self.model.jev_bound_qualities(*self.keys)
 
@@ -69,17 +67,88 @@ class JevRatingPanel(Panel):
 
         def get_context_data(self, parent_context=None):
             context = super().get_context_data(parent_context)
-            qualities = self.panel.model.jev_bound_qualities(*self.panel.keys)
-            context["jev_url"] = reverse("wagtail_jev:rate")
-            context["jev_model"] = self.panel.model._meta.label
-            context["jev_keys"] = ",".join(quality.key for quality in qualities)
-            context["jev_messages"] = json.dumps(_rating_messages())
+            context.update(
+                _rating_context(
+                    self.panel.model,
+                    self.panel.keys,
+                    empty=_("Nothing to rate yet: the page has no text."),
+                )
+            )
             return context
 
 
-def _rating_messages() -> dict[str, str]:
+class JevRatingFieldPanel(FieldPanel):
+    """A ``FieldPanel`` for a text field with a "Rate with Jev" button beneath it that rates
+    just that field's Excerpt on the Qualities ``keys``.
+
+    Works on ``RichTextField``, ``StreamField``, ``CharField`` and ``TextField``. When one
+    Quality is attached the button names it. Ratings are only displayed, never saved.
+    """
+
+    def __init__(self, field_name, *, keys, **kwargs):
+        super().__init__(field_name, **kwargs)
+        self.keys = tuple(keys)
+
+    def clone_kwargs(self):
+        kwargs = super().clone_kwargs()
+        kwargs["keys"] = self.keys
+        return kwargs
+
+    def on_model_bound(self):
+        super().on_model_bound()
+        _check_rating_model(self)
+        # Fail loudly here on a typo in ``keys`` or a field Jev cannot read, not on button press.
+        self.model.jev_bound_qualities(*self.keys)
+        text_field(self.model, self.field_name)
+
+    class BoundPanel(FieldPanel.BoundPanel):
+        template_name = "wagtail_jev/panels/rating_field_panel.html"
+
+        class Media:
+            js = ["wagtail_jev/js/jev-rate-controller.js"]
+
+        def get_context_data(self, parent_context=None):
+            context = super().get_context_data(parent_context)
+            context.update(
+                _rating_context(
+                    self.panel.model,
+                    self.panel.keys,
+                    field_name=self.panel.field_name,
+                    empty=_("Nothing to rate yet: the field has no text."),
+                )
+            )
+            return context
+
+
+def _check_rating_model(panel):
+    if not issubclass(panel.model, JevTaggableMixin):
+        raise ImproperlyConfigured(
+            f"{type(panel).__name__} needs {panel.model.__name__} to mix in JevTaggableMixin"
+        )
+
+
+def _rating_context(model, keys, *, empty, field_name="") -> dict:
+    """Template context shared by both rating panels: the endpoint, the subject and the keys.
+
+    ``keys`` is rendered as an explicit list so the "default to every Quality" choice is
+    resolved at render time, not by the controller.
+    """
+    qualities = model.jev_bound_qualities(*keys)
+    if len(qualities) == 1:
+        button_label = _("Rate %(quality)s with Jev") % {"quality": qualities[0].label}
+    else:
+        button_label = _("Rate with Jev")
     return {
-        "loading": str(_("Asking Jev…")),
-        "empty": str(_("Nothing to rate yet: the page has no text.")),
-        "error": str(_("Jev error: ")),
+        "jev_url": reverse("wagtail_jev:rate"),
+        "jev_model": model._meta.label,
+        "jev_field": field_name,
+        "jev_keys": ",".join(quality.key for quality in qualities),
+        "jev_button_label": button_label,
+        "jev_messages": json.dumps(
+            {
+                "loading": str(_("Asking Jev…")),
+                "empty": str(empty),
+                "error": str(_("Jev error: ")),
+            }
+        ),
     }
