@@ -1,21 +1,27 @@
 # wagtail-jev
 
-Let [Jev](https://docs.typesafe.ai), TypeSafe's System One model, suggest tags for
-Wagtail pages and rate their text on Qualities you declare. Editors get a **Let Jev
-suggest tags** button under the tag field; it scores every existing tag against the
-page content currently in the editor and adds the ones that pass a confidence
-threshold. A **Rate with Jev** button shows how the page, or one field of it, reads on
-a rubric such as readability or mood.
+wagtail-jev adds two buttons to the Wagtail page editor. Both send the text the editor
+is writing to [Jev](https://docs.typesafe.ai), an AI model from TypeSafe, and show
+what it says.
 
-Each candidate tag is one yes/no (Noul) question, each Quality one rubric (Score)
-question, all fanned out in a single request. Thresholding, capping and ranking happen
-in your code, so tuning needs no re-inference.
+- **Let Jev suggest tags** sits under a tag field. Jev looks at every tag your site
+  already has and picks the ones that fit the page.
+- **Rate with Jev** rates the page, or one field of it, on a scale you define, such as
+  readability or mood. The result is shown to the editor and never saved.
+
+One button press is one request to Jev, no matter how many tags or scales it covers.
+For tags, Jev returns a probability for each one. Your code decides how high that
+probability must be, so you can tune it without asking Jev again.
 
 ## Install
+
+Install the package:
 
 ```sh
 pip install wagtail-jev
 ```
+
+Add it to your Django settings, together with your TypeSafe API key:
 
 ```python
 INSTALLED_APPS = [
@@ -23,10 +29,16 @@ INSTALLED_APPS = [
     ...
 ]
 
-WAGTAIL_JEV_API_KEY = env("TYPESAFE_API_KEY")  # or leave unset and export TYPESAFE_API_KEY
+WAGTAIL_JEV_API_KEY = "..."
 ```
 
+If you leave out `WAGTAIL_JEV_API_KEY`, the `TYPESAFE_API_KEY` environment variable is
+used instead.
+
 ## Use
+
+Three changes to your page model: add `JevTaggableMixin`, list the fields Jev should
+read in `jev_text_fields`, and use `JevTagFieldPanel` for the tag field:
 
 ```python
 from modelcluster.contrib.taggit import ClusterTaggableManager
@@ -42,7 +54,7 @@ class ArticlePage(JevTaggableMixin, Page):
     tags = ClusterTaggableManager(through="blog.ArticleTag", blank=True)
 
     jev_text_fields = ("title", "intro", "body")  # what Jev reads
-    # jev_tag_fields = {"tags": JevTagField()}    # default
+    # jev_tag_fields = {"tags": JevTagField()}    # the default: tag the "tags" field
 
     content_panels = Page.content_panels + [
         FieldPanel("intro"),
@@ -51,28 +63,27 @@ class ArticlePage(JevTaggableMixin, Page):
     ]
 ```
 
-`JevTagFieldPanel` renders the normal tag widget plus the button. The button posts the
-unsaved form data to an admin endpoint, so suggestions reflect what the editor is
-looking at. Returned tags are appended to the tag widget; nothing is saved until the
-editor saves the page.
+`JevTagFieldPanel` shows the normal tag widget with the button under it. The button
+sends the current form contents to Jev, so unsaved edits count. Suggested tags are
+added to the tag widget. Nothing is saved until the editor saves the page.
 
 ### Several tag fields
 
-A page can have any number of tag fields, each with its own tag model, prompts
-and threshold. Candidates default to every row of the tag model behind the field,
-so a `feeling_tags` manager whose through model points at `FeelingTag` is only
-ever offered feelings.
+A page can have more than one tag field. Give each one its own `JevTagField` in
+`jev_tag_fields`. Each can have its own question, its own threshold and its own list
+of tags. By default, the list is every tag in that field's tag model.
+
+Below, `tags` keeps the defaults. `feeling_tags` changes all three. `PromptTemplates`
+holds the question, in the same three parts as the prompt settings:
 
 ```python
 from wagtail_jev.classifier import PromptTemplates
-from wagtail_jev.models import JevTagField, JevTaggableMixin
+from wagtail_jev.models import JevTagField
 
 
 class ArticlePage(JevTaggableMixin, Page):
     tags = ClusterTaggableManager(through="blog.ArticleTag", blank=True)
-    feeling_tags = ClusterTaggableManager(
-        through="blog.ArticleFeeling", blank=True, related_name="feeling_tagged"
-    )
+    feeling_tags = ClusterTaggableManager(through="blog.ArticleFeeling", blank=True)
 
     jev_tag_fields = {
         "tags": JevTagField(),
@@ -83,7 +94,7 @@ class ArticlePage(JevTaggableMixin, Page):
                 criteria_false="{tag} does not describe the article's tone.",
             ),
             threshold=0.8,
-            candidates=lambda: ["calm", "tense", "joyful"],  # optional override
+            candidates=lambda: ["calm", "tense", "joyful"],
         ),
     }
 
@@ -93,30 +104,41 @@ class ArticlePage(JevTaggableMixin, Page):
     ]
 ```
 
-`JevTagField` attributes (`templates`, `candidates`, `threshold`, `max_tags`) all
-default to the corresponding `WAGTAIL_JEV_*` settings.
+Every `JevTagField` argument is optional. Leave one out and the matching
+`WAGTAIL_JEV_*` setting from the table below is used.
 
 ### Bulk tagging
 
+To tag many saved pages at once, use the `jev_tag_pages` management command:
+
 ```sh
-manage.py jev_tag_pages blog.ArticlePage            # print suggestions
-manage.py jev_tag_pages blog.ArticlePage --apply    # save as new draft revisions
+manage.py jev_tag_pages blog.ArticlePage
+manage.py jev_tag_pages blog.ArticlePage --apply
 manage.py jev_tag_pages blog.ArticlePage --apply --publish --threshold 0.8 --ids 12 34
-manage.py jev_tag_pages blog.ArticlePage --field feeling_tags   # default: all jev_tag_fields
+manage.py jev_tag_pages blog.ArticlePage --field feeling_tags
 ```
+
+- With no options it only prints what Jev would suggest.
+- `--apply` saves the tags as a new draft revision of each page. Add `--publish` to
+  publish as well.
+- `--threshold` overrides the threshold and `--ids` limits the run to those pages.
+- `--field` tags one tag field. The default is every field in `jev_tag_fields`.
 
 ### In code
 
-A saved page scores itself:
+Call `jev_suggest_tags()` on a saved page to get its tag suggestions:
 
 ```python
 for s in page.jev_suggest_tags("tags"):
     print(s.name, s.probability)
 ```
 
-Or take the Tag field and hand it any `Article`. `jev_tag_field()` resolves the
-field's `JevTagField` against the `WAGTAIL_JEV_*` settings once, and `suggest()`
-runs the whole pipeline: candidates minus existing tags, scored, thresholded, capped.
+You can also suggest tags for text that is not a saved page. First look up the tag
+field with `jev_tag_field()`. Then call its `suggest()` method with an `Article`. An
+Article is just a title and a body.
+
+`suggest()` does the same work as the button. It skips tags the Article already has,
+scores the rest, and keeps only the tags above the threshold, up to the cap.
 
 ```python
 from wagtail_jev.article import Article
@@ -127,17 +149,23 @@ for s in tag_field.suggest(article):
     print(s.name, s.probability)
 ```
 
-For raw probabilities with no threshold or cap, use `wagtail_jev.classifier.score_tags`.
+If you want every tag's probability with no threshold or cap, use
+`wagtail_jev.classifier.score_tags` instead.
 
 ## Qualities
 
-Tags say what a page is about. A **Quality** is a spectrum its text is judged on: how
-easy it is to understand, what mood it leaves the reader in. You declare a Quality once
-on the page model as an ordered rubric of levels, and Jev answers with a **Rating**: the
-most likely level plus a probability for every level. A Rating is shown in the editor
-and never saved. Nothing about a Quality is a tag.
+Tags say what a page is about. A **Quality** says how the text reads. Readability is
+one example. Mood is another.
+
+You define a Quality on the page model as a list of levels, from lowest to highest.
+When an editor presses the button, Jev picks the level that fits the text best. It
+also gives a probability for every level. This answer is called a **Rating**. Ratings
+are shown to the editor and never saved. A Quality is not a tag.
 
 ### Writing a rubric
+
+Here are two Qualities you can copy. The first rates how easy the text is to read. The
+second rates its mood.
 
 ```python
 from wagtail_jev.quality import Level, Quality
@@ -163,73 +191,89 @@ MOOD = Quality(
 )
 ```
 
-Each level has a short `label` the editor sees and a `description` Jev judges. Three
-rules for writing them:
+Each level has a short `label` and a longer `description`. The editor sees the label.
+Jev judges the text against the description. Three rules for writing levels:
 
-- **Two to ten levels**, lowest first. Fewer or more is an error when the Quality is
-  bound: when a panel binds, or the first time code looks the key up.
-- **Describe a concrete situation**, not a degree. Jev judges each level on its own, so
-  "A reader has to reread a few sentences" works and "Moderately readable" does not.
-- **Say "the text"**, never "the article" or "the field". The same Quality then rates
-  the whole Article and any single field's Excerpt.
+- **Use two to ten levels**, lowest first. Any other number raises an error when the
+  panel is set up.
+- **Describe a concrete situation**, not a degree. Jev judges each level on its own.
+  "A reader has to reread a few sentences" works. "Moderately readable" does not.
+- **Say "the text"**, never "the article" or "the field". Then the same Quality can
+  rate the whole page or a single field.
 
-No rubrics ship with the package; adapt these two to your site.
+The package ships no rubrics. Copy these two and adapt them to your site.
 
 ### In the editor
 
-Declare each Quality under a key in `jev_qualities`, then place the panels:
+Add each Quality under a key in `jev_qualities`, then place the panels:
 
 ```python
-from wagtail_jev.panels import JevRatingFieldPanel, JevRatingPanel, JevTagFieldPanel
+from wagtail_jev.panels import JevRatingFieldPanel, JevRatingPanel
 
 
 class ArticlePage(JevTaggableMixin, Page):
-    intro = RichTextField(blank=True)
-    body = StreamField([...], blank=True)
-    tags = ClusterTaggableManager(through="blog.ArticleTag", blank=True)
-
-    jev_text_fields = ("title", "intro", "body")
+    ...
     jev_qualities = {"readability": READABILITY, "mood": MOOD}
 
     content_panels = Page.content_panels + [
-        JevRatingFieldPanel("intro", keys=["readability"]),  # rates only the intro
+        JevRatingFieldPanel("intro", keys=["readability"]),
         JevRatingFieldPanel("body", keys=["readability", "mood"]),
         JevTagFieldPanel("tags"),
-        JevRatingPanel(),  # the whole Article on every Quality
+        JevRatingPanel(),
     ]
 ```
 
-`JevRatingPanel` adds a **Rate with Jev** button that rates the Article (the title and
-every `jev_text_fields` field) on every declared Quality. It goes anywhere in a panel
-list, and `keys` limits it to a subset:
+This gives the editor three buttons. One under the intro rates it on readability. One
+under the body rates it on readability and mood. The last rates the whole page on
+every Quality.
+
+`JevRatingPanel` adds a **Rate with Jev** button for the whole page. It rates the title
+plus every field in `jev_text_fields`, on every Quality. It can go anywhere in a panel
+list. Pass `keys` to rate only some Qualities:
 
 ```python
 JevRatingPanel(keys=["readability"], heading="Readability")
 ```
 
-`JevRatingFieldPanel` replaces `FieldPanel` for a `RichTextField`, `StreamField`,
-`CharField` or `TextField`. Its button rates that field's **Excerpt**, the flattened text
-of that one field with no title, on `keys`.
+`JevRatingFieldPanel` replaces `FieldPanel` for one text field. It works on a
+`RichTextField`, `StreamField`, `CharField` or `TextField`. Its button rates only that
+field's text, on the Qualities in `keys`. That text is called the **Excerpt**.
 
-When exactly one Quality is attached, either button names it: **Rate Readability with
-Jev**. Both post the unsaved form data, so Ratings reflect what the editor is looking
-at. Each Rating is one line, `Readability: Easy (62%)`, with every level's probability
-behind a click. One press is one Jev request however many Qualities it covers, and
-empty text makes no request. An unknown key or a field Jev cannot read fails when the
-panel binds, not when an editor presses the button.
+When a button covers exactly one Quality, it is named after it, for example **Rate
+Readability with Jev**.
+
+Both buttons work the same way:
+
+- They send the current form contents, so unsaved edits count.
+- Each Rating is shown as one line, such as `Readability: Easy (62%)`. Click it to see
+  the probability of every level.
+- One press is one request to Jev, however many Qualities it covers.
+- Empty text makes no request.
+- A misspelt key, or a field Jev cannot read, raises an error when the panel is set
+  up, not when an editor presses the button.
 
 ### Rating in code
 
-A saved page rates its own Article, on every Quality or a subset, in one request:
+A saved page has a `jev_rate()` method. It returns one Rating per Quality, from one
+request to Jev:
 
 ```python
-for r in page.jev_rate():  # or page.jev_rate("readability")
-    print(r.label, r.top_label, r.percent)  # Readability Easy 62
-    for level, probability in zip(r.levels, r.probabilities):
-        print(" ", level.label, probability)
+for rating in page.jev_rate():
+    print(rating.label, rating.top_label, rating.percent)  # Readability Easy 62
 ```
 
-Or take one bound Quality and hand it any `Article` or `Excerpt`:
+To rate only some Qualities, pass their keys: `page.jev_rate("readability")`.
+
+Each Rating also lists the probability of every level:
+
+```python
+for level, probability in zip(rating.levels, rating.probabilities):
+    print(level.label, probability)
+```
+
+You can also rate text that is not a page. First look up a Quality with
+`jev_quality()`. Then call its `rate()` method with the text. The text can be an
+`Article` (a title and a body) or an `Excerpt` (a single piece of text):
 
 ```python
 from wagtail_jev.article import Article, Excerpt
@@ -240,35 +284,41 @@ readability.rate(Excerpt(text="One dense paragraph."))
 readability.rate(Excerpt.from_page(page, "intro"))
 ```
 
-`rate()` returns `None` when there is nothing to rate. To rate several bound Qualities
-in one request, pass them to `wagtail_jev.quality.rate(qualities, subject)`. Both,
-like `jev_rate()`, take a `client=` keyword so tests can inject a stub `TypeSafeClient`.
+The last line reads the `intro` field from a saved page. `rate()` returns `None` when
+the text is empty.
 
-Qualities have no threshold, cap or settings of their own. They share
-`WAGTAIL_JEV_MODEL`, `WAGTAIL_JEV_API_KEY`, `WAGTAIL_JEV_TIMEOUT` and
-`WAGTAIL_JEV_MAX_CHARS` with tagging, and need no migration.
+To rate one text on several Qualities in one request, use
+`wagtail_jev.quality.rate(qualities, subject)`. Every rating function also takes a
+`client=` argument. Tests use it to pass in a fake Jev client.
+
+Qualities have no threshold and no cap. They have no settings of their own. They use
+the same model, API key, timeout and max chars settings as tagging. They need no
+database migration.
 
 ## Settings
 
+Put these in your Django settings. Only the API key is required. The tag settings can
+also be set per tag field, as shown in "Several tag fields" above.
+
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `WAGTAIL_JEV_API_KEY` | `None` | Falls back to `TYPESAFE_API_KEY` env var |
-| `WAGTAIL_JEV_MODEL` | `"jev-latest"` | Pin a versioned ID once thresholds are tuned |
-| `WAGTAIL_JEV_THRESHOLD` | `0.6` | Minimum probability for a tag to be suggested |
-| `WAGTAIL_JEV_MAX_TAGS` | `None` | Cap on suggestions per page |
-| `WAGTAIL_JEV_MAX_CHARS` | `12000` | Body text sent to Jev is truncated to this |
-| `WAGTAIL_JEV_BATCH_SIZE` | `40` | Candidate tags per request |
-| `WAGTAIL_JEV_TAG_MODEL` | `"taggit.Tag"` | Model whose rows are the candidate tags |
-| `WAGTAIL_JEV_CANDIDATES` | `None` | Dotted path to a callable returning tag names; overrides the model |
-| `WAGTAIL_JEV_TIMEOUT` | `30.0` | Request timeout in seconds |
-| `WAGTAIL_JEV_INSTRUCTIONS` | see below | Question template |
-| `WAGTAIL_JEV_CRITERIA_TRUE` | see below | What a "yes" means |
-| `WAGTAIL_JEV_CRITERIA_FALSE` | see below | What a "no" means |
+| `WAGTAIL_JEV_API_KEY` | `None` | Your TypeSafe API key. If unset, the `TYPESAFE_API_KEY` environment variable is used |
+| `WAGTAIL_JEV_MODEL` | `"jev-latest"` | Which Jev model to use. Pin a specific version once your threshold is tuned |
+| `WAGTAIL_JEV_THRESHOLD` | `0.6` | A tag is suggested only if its probability is at least this |
+| `WAGTAIL_JEV_MAX_TAGS` | `None` | Suggest at most this many tags per page |
+| `WAGTAIL_JEV_MAX_CHARS` | `12000` | Only the first this-many characters of the page text are sent to Jev |
+| `WAGTAIL_JEV_BATCH_SIZE` | `40` | How many tags to ask about in one request |
+| `WAGTAIL_JEV_TAG_MODEL` | `"taggit.Tag"` | The model whose rows are the tags Jev can choose from |
+| `WAGTAIL_JEV_CANDIDATES` | `None` | Dotted path to a function that returns tag names. Replaces the tag model |
+| `WAGTAIL_JEV_TIMEOUT` | `30.0` | Give up on a request after this many seconds |
+| `WAGTAIL_JEV_INSTRUCTIONS` | see below | The question asked about each tag |
+| `WAGTAIL_JEV_CRITERIA_TRUE` | see below | What a "yes" answer means |
+| `WAGTAIL_JEV_CRITERIA_FALSE` | see below | What a "no" answer means |
 
 ### Prompts
 
-`{tag}` is replaced with the quoted tag name. The page is available to the model as
-`article.title` and `article.body`; the page's current tags as `existing_tags`.
+Jev answers a yes/no question about each tag. Three settings hold the wording of that
+question. These are the defaults:
 
 ```python
 WAGTAIL_JEV_INSTRUCTIONS = (
@@ -279,28 +329,44 @@ WAGTAIL_JEV_CRITERIA_TRUE = "The article is substantially about, or clearly belo
 WAGTAIL_JEV_CRITERIA_FALSE = "The topic {tag} is absent or only mentioned in passing."
 ```
 
-Per-field override: pass `PromptTemplates(...)` as `templates` on the field's
-`JevTagField` (see "Several tag fields" above).
+`{tag}` stands for the tag name. `article` is the page, with a `title` and a `body`.
+`existing_tags` lists the tags the page already has. You can use all three in your own
+wording.
+
+To change the prompts for one tag field only, give its `JevTagField` a
+`templates=PromptTemplates(...)` argument. The "Several tag fields" section above shows
+this.
 
 ## Tuning
 
-Start with the default threshold, run `jev_tag_pages` without `--apply` on a sample
-of pages, and compare against editor judgment. Raise the threshold if you see false
-positives; lower it or adjust the prompt if good tags are missed. Non-English content
-works but is less accurate; test on your own data.
+Start with the default threshold. Run `jev_tag_pages` without `--apply` on some pages.
+Compare the output with the tags your editors would choose.
+
+- If Jev suggests wrong tags, raise the threshold.
+- If Jev misses good tags, lower the threshold or change the prompt.
+
+Text in other languages than English works, but less accurately. Test on your own
+content.
 
 ## Development
 
+Install the package in a virtualenv and run the tests:
+
 ```sh
-uv venv && uv pip install -e ".[test]"
+uv venv
+uv pip install -e ".[test]"
 pytest
 ```
 
-Manual check of the editor button against a stubbed Jev client:
+To try the buttons in a browser, start a local site. It uses a fake Jev, so it needs
+no API key:
 
 ```sh
-python tests/manual_e2e.py          # stubbed Jev, no network
-python tests/manual_e2e.py --live   # real Jev; reads WAGTAIL_API_KEY or TYPESAFE_API_KEY from .env
+python tests/manual_e2e.py
 ```
 
-Then log in at http://127.0.0.1:8765/admin/ as `admin` / `pw` and open the "Django tips" page.
+Log in at http://127.0.0.1:8765/admin/ with the username `admin` and the password
+`pw`. Then open the "Django tips" page.
+
+Add `--live` to use the real Jev. The script reads the API key from `WAGTAIL_API_KEY`
+or `TYPESAFE_API_KEY` in your `.env` file.
