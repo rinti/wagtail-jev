@@ -1,12 +1,15 @@
 # wagtail-jev
 
 Let [Jev](https://docs.typesafe.ai), TypeSafe's System One model, suggest tags for
-Wagtail pages. Editors get a **Let Jev suggest tags** button under the tag field; it
-scores every existing tag against the page content currently in the editor and adds
-the ones that pass a confidence threshold.
+Wagtail pages and rate their text on Qualities you declare. Editors get a **Let Jev
+suggest tags** button under the tag field; it scores every existing tag against the
+page content currently in the editor and adds the ones that pass a confidence
+threshold. A **Rate with Jev** button shows how the page, or one field of it, reads on
+a rubric such as readability or mood.
 
-Each candidate tag is one yes/no (Noul) question, all fanned out in a single request.
-Thresholding, capping and ranking happen in your code, so tuning needs no re-inference.
+Each candidate tag is one yes/no (Noul) question, each Quality one rubric (Score)
+question, all fanned out in a single request. Thresholding, capping and ranking happen
+in your code, so tuning needs no re-inference.
 
 ## Install
 
@@ -125,6 +128,125 @@ for s in tag_field.suggest(article):
 ```
 
 For raw probabilities with no threshold or cap, use `wagtail_jev.classifier.score_tags`.
+
+## Qualities
+
+Tags say what a page is about. A **Quality** is a spectrum its text is judged on: how
+easy it is to understand, what mood it leaves the reader in. You declare a Quality once
+on the page model as an ordered rubric of levels, and Jev answers with a **Rating**: the
+most likely level plus a probability for every level. A Rating is shown in the editor
+and never saved. Nothing about a Quality is a tag.
+
+### Writing a rubric
+
+```python
+from wagtail_jev.quality import Level, Quality
+
+READABILITY = Quality(
+    label="Readability",
+    instructions="How easy is the text to understand?",
+    levels=(
+        Level("Easy", "A first-time reader follows every sentence without slowing down."),
+        Level("Moderate", "A reader has to reread a few sentences or look up a term."),
+        Level("Hard", "The text assumes expert knowledge or packs several ideas into each sentence."),
+    ),
+)
+
+MOOD = Quality(
+    label="Mood",
+    instructions="What mood does the text leave the reader in?",
+    levels=(
+        Level("Sad", "The text dwells on loss, failure or disappointment."),
+        Level("Neutral", "The text reports facts without emotional colour."),
+        Level("Happy", "The text celebrates, reassures or looks forward to something."),
+    ),
+)
+```
+
+Each level has a short `label` the editor sees and a `description` Jev judges. Three
+rules for writing them:
+
+- **Two to ten levels**, lowest first. Fewer or more is an error when the Quality is
+  bound: when a panel binds, or the first time code looks the key up.
+- **Describe a concrete situation**, not a degree. Jev judges each level on its own, so
+  "A reader has to reread a few sentences" works and "Moderately readable" does not.
+- **Say "the text"**, never "the article" or "the field". The same Quality then rates
+  the whole Article and any single field's Excerpt.
+
+No rubrics ship with the package; adapt these two to your site.
+
+### In the editor
+
+Declare each Quality under a key in `jev_qualities`, then place the panels:
+
+```python
+from wagtail_jev.panels import JevRatingFieldPanel, JevRatingPanel, JevTagFieldPanel
+
+
+class ArticlePage(JevTaggableMixin, Page):
+    intro = RichTextField(blank=True)
+    body = StreamField([...], blank=True)
+    tags = ClusterTaggableManager(through="blog.ArticleTag", blank=True)
+
+    jev_text_fields = ("title", "intro", "body")
+    jev_qualities = {"readability": READABILITY, "mood": MOOD}
+
+    content_panels = Page.content_panels + [
+        JevRatingFieldPanel("intro", keys=["readability"]),  # rates only the intro
+        JevRatingFieldPanel("body", keys=["readability", "mood"]),
+        JevTagFieldPanel("tags"),
+        JevRatingPanel(),  # the whole Article on every Quality
+    ]
+```
+
+`JevRatingPanel` adds a **Rate with Jev** button that rates the Article (the title and
+every `jev_text_fields` field) on every declared Quality. It goes anywhere in a panel
+list, and `keys` limits it to a subset:
+
+```python
+JevRatingPanel(keys=["readability"], heading="Readability")
+```
+
+`JevRatingFieldPanel` replaces `FieldPanel` for a `RichTextField`, `StreamField`,
+`CharField` or `TextField`. Its button rates that field's **Excerpt**, the flattened text
+of that one field with no title, on `keys`.
+
+When exactly one Quality is attached, either button names it: **Rate Readability with
+Jev**. Both post the unsaved form data, so Ratings reflect what the editor is looking
+at. Each Rating is one line, `Readability: Easy (62%)`, with every level's probability
+behind a click. One press is one Jev request however many Qualities it covers, and
+empty text makes no request. An unknown key or a field Jev cannot read fails when the
+panel binds, not when an editor presses the button.
+
+### Rating in code
+
+A saved page rates its own Article, on every Quality or a subset, in one request:
+
+```python
+for r in page.jev_rate():  # or page.jev_rate("readability")
+    print(r.label, r.top_label, r.percent)  # Readability Easy 62
+    for level, probability in zip(r.levels, r.probabilities):
+        print(" ", level.label, probability)
+```
+
+Or take one bound Quality and hand it any `Article` or `Excerpt`:
+
+```python
+from wagtail_jev.article import Article, Excerpt
+
+readability = ArticlePage.jev_quality("readability")
+readability.rate(Article(title="Django ORM tips", body="select_related and friends"))
+readability.rate(Excerpt(text="One dense paragraph."))
+readability.rate(Excerpt.from_page(page, "intro"))
+```
+
+`rate()` returns `None` when there is nothing to rate. To rate several bound Qualities
+in one request, pass them to `wagtail_jev.quality.rate(qualities, subject)`. Both,
+like `jev_rate()`, take a `client=` keyword so tests can inject a stub `TypeSafeClient`.
+
+Qualities have no threshold, cap or settings of their own. They share
+`WAGTAIL_JEV_MODEL`, `WAGTAIL_JEV_API_KEY`, `WAGTAIL_JEV_TIMEOUT` and
+`WAGTAIL_JEV_MAX_CHARS` with tagging, and need no migration.
 
 ## Settings
 

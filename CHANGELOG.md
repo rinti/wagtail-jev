@@ -9,20 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Quality` and `Level` (`wagtail_jev.quality`): an ordered rubric Jev rates an Article on, declared in `JevTaggableMixin.jev_qualities`.
-- `page.jev_rate(*keys)` returns a `Rating` per Quality from one Jev request; `jev_quality(key)` returns the bound Quality.
-- `JevRatingPanel` (`wagtail_jev.panels`): a "Rate with Jev" button that rates the editor's unsaved Article on all or some Qualities; Ratings are shown, never saved.
-- `JevRatingFieldPanel` (`wagtail_jev.panels`): a `FieldPanel` for a `RichTextField`, `StreamField`, `CharField` or `TextField` with a "Rate with Jev" button that rates just that field's Excerpt on the given Quality keys. With one key the button names the Quality.
-- `Excerpt` (`wagtail_jev.article`): the flattened text of one field, built from a saved page (`Excerpt.from_page`) or from unsaved edit-form data (`Excerpt.from_form_data`). A bound Quality's `rate()` takes an Article or an Excerpt.
-- `Quality.label`: the display name editors see for a Quality; falls back to the key. Sent as `label` on every Rating.
-- Admin endpoint `wagtail_jev:rate` returns the Ratings for the posted edit form; with `jev_field` it rates that field's Excerpt instead of the Article.
-- `JevTaggableMixin.jev_bound_qualities(*keys)` returns the bound Qualities in declaration order.
+- `Quality` and `Level` (`wagtail_jev.quality`): an ordered rubric of two to ten levels Jev rates a text on, each level a short label for the editor and a concrete description for Jev. Declared under a key in `JevTaggableMixin.jev_qualities`; `Quality.label` is the display name and falls back to the key. Each Quality is one Score question.
+- `Rating` (`wagtail_jev.quality`): the most likely level, the argmax of the per-level probabilities, plus a probability for every level. Shown, never saved; not gated by any threshold.
+- `Excerpt` (`wagtail_jev.article`): the flattened text of one field, with no title and no tags, built from a saved page (`Excerpt.from_page`) or from unsaved edit-form data (`Excerpt.from_form_data`).
+- `JevTaggableMixin.jev_quality(key)` returns the bound Quality and `jev_bound_qualities(*keys)` the bound Qualities in declaration order. A bound Quality's `rate()` takes an Article or an Excerpt.
+- `page.jev_rate(*keys)` and `wagtail_jev.quality.rate()` rate every requested Quality in one Jev request.
+- `JevRatingPanel` (`wagtail_jev.panels`): a "Rate with Jev" button that rates the editor's unsaved Article on all or some Qualities.
+- `JevRatingFieldPanel` (`wagtail_jev.panels`): a `FieldPanel` for a `RichTextField`, `StreamField`, `CharField` or `TextField` with a "Rate with Jev" button that rates just that field's Excerpt on the given Quality keys.
+- Both rating panels name the Quality on the button when exactly one is attached.
+- Admin endpoint `wagtail_jev:rate` returns the Ratings for the posted edit form; with `jev_field` it rates that field's Excerpt instead of the Article. Each Rating carries `key`, `label`, the top level and every level's probability.
+- Qualities share `WAGTAIL_JEV_MODEL`, `WAGTAIL_JEV_API_KEY`, `WAGTAIL_JEV_TIMEOUT` and `WAGTAIL_JEV_MAX_CHARS` with tagging; no new settings, no migration.
 - `BoundTagField` (`wagtail_jev.tag_field`): one Tag field with settings resolved; `suggest(article)` runs the whole pipeline.
 - `JevTaggableMixin.jev_tag_field()` returns the bound Tag field for a page model.
 
 ### Changed
 
-- `Article.from_page()` and `Article.from_form_data()` no longer require a Tag field name; `from_form_data()` takes it as keyword `field_name`.
+- `Article.from_page()` and `Article.from_form_data()` no longer require a Tag field name; `from_form_data()` takes it as keyword `field_name`. An Article built for rating carries no existing tags.
 - `jev_suggest_tags()` accepts only `client`; threshold and cap come from the Tag field.
 - `score_tags()` and `build_question()` require `templates`.
 - `JevTagField` lives in `wagtail_jev.tag_field`; `wagtail_jev.models` still exports it.
