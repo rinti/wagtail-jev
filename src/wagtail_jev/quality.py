@@ -19,7 +19,7 @@ from typing import Sequence, Union
 
 from typesafe_sdk import Score, TypeSafeClient
 
-from wagtail_jev import classifier
+from wagtail_jev import client as jev_client
 from wagtail_jev.article import Article, Excerpt
 from wagtail_jev.settings import get_setting
 
@@ -145,7 +145,7 @@ def rate(
 
     questions = {quality.key: quality.question() for quality in qualities}
     owns_client = client is None
-    client = client or classifier.get_client()
+    client = client or jev_client.get_client()
     try:
         response = client.system_one(_state(subject), questions)
     finally:

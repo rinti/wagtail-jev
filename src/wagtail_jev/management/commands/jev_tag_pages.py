@@ -14,7 +14,7 @@ from django.apps import apps
 from django.core.management.base import BaseCommand, CommandError
 from typesafe_sdk import TypeSafeError
 
-from wagtail_jev import classifier
+from wagtail_jev import client as jev_client
 from wagtail_jev.article import Article
 from wagtail_jev.models import JevTaggableMixin
 
@@ -52,7 +52,7 @@ class Command(BaseCommand):
         if options["ids"]:
             queryset = queryset.filter(id__in=options["ids"])
 
-        with classifier.get_client() as client:
+        with jev_client.get_client() as client:
             for page in queryset.iterator():
                 changed = False
                 for tag_field in tag_fields:

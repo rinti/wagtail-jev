@@ -3,8 +3,7 @@ from taggit.models import Tag
 
 from tests.testapp.models import ArticlePage, FeelingTag
 from wagtail_jev.article import Article
-from wagtail_jev.classifier import PromptTemplates
-from wagtail_jev.tag_field import JevTagField
+from wagtail_jev.tag_field import JevTagField, PromptTemplates
 
 ARTICLE = Article(title="Django ORM tips", body="select_related and friends")
 
@@ -68,6 +67,68 @@ def test_candidates_fall_back_to_the_tag_model_setting_for_non_taggable_fields(t
     settings.WAGTAIL_JEV_TAG_MODEL = "testapp.FeelingTag"
     tag_field = JevTagField().bind(ArticlePage, "title")
     assert tag_field.candidates(ARTICLE) == ["angry", "calm"]
+
+
+def _field(candidates, **kwargs):
+    return JevTagField(
+        candidates=lambda: candidates,
+        templates=PromptTemplates("Q {tag}", "T {tag}", "F {tag}"),
+        **kwargs,
+    ).bind(ArticlePage, "tags")
+
+
+def test_score_returns_every_candidate_sorted_high_to_low(fake_client):
+    client = fake_client({"python": 0.9, "django": 0.7, "cooking": 0.1})
+    article = Article(title="Django ORM tips", body="...", existing_tags=("orm",))
+
+    result = _field(["cooking", "django", "python"]).score(article)
+
+    assert [(s.name, s.probability) for s in result] == [("python", 0.9), ("django", 0.7), ("cooking", 0.1)]
+    state, questions = client.calls[0]
+    assert state == {"article": {"title": "Django ORM tips", "body": "..."}, "existing_tags": ["orm"]}
+    assert len(questions) == 3
+
+
+def test_score_ignores_threshold_and_cap(fake_client):
+    fake_client({"a": 0.95, "b": 0.05})
+    assert [s.name for s in _field(["a", "b"], threshold=0.9, max_tags=1).score(ARTICLE)] == ["a", "b"]
+
+
+def test_score_batches_candidates(fake_client, settings):
+    settings.WAGTAIL_JEV_BATCH_SIZE = 2
+    client = fake_client({"a": 0.1, "b": 0.2, "c": 0.3})
+    result = _field(["a", "b", "c"]).score(ARTICLE)
+    assert len(client.calls) == 2
+    assert [s.name for s in result] == ["c", "b", "a"]
+
+
+def test_score_dedupes_and_drops_blank_candidates(fake_client):
+    client = fake_client({"a": 0.5})
+    result = _field(["a", "", " ", "a"]).score(ARTICLE)
+    assert [s.name for s in result] == ["a"]
+    assert len(client.calls[0][1]) == 1
+
+
+def test_empty_candidates_makes_no_request(fake_client):
+    client = fake_client({})
+    assert _field([]).score(ARTICLE) == []
+    assert client.calls == []
+
+
+def test_body_is_truncated_to_max_chars(fake_client, settings):
+    settings.WAGTAIL_JEV_MAX_CHARS = 5
+    client = fake_client({"a": 0.9})
+    _field(["a"]).score(Article(title="t", body="0123456789"))
+    assert client.calls[0][0]["article"]["body"] == "01234"
+
+
+def test_questions_are_built_from_the_fields_templates(fake_client):
+    client = fake_client({"python": 0.9})
+    _field(["python"]).score(ARTICLE)
+    question = client.calls[0][1]["tag_0"]
+    assert question.instructions == "Q 'python'"
+    assert question.criteria["true"] == "T 'python'"
+    assert question.criteria["false"] == "F 'python'"
 
 
 def test_suggest_keeps_only_at_or_above_threshold_sorted(fake_client):

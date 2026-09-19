@@ -1,24 +1,59 @@
 """The Tag field: one taggable manager on a page, with its own tag model, prompt
-templates, threshold and cap.
+templates, threshold and cap. The one place that turns an Article into Suggestions.
 
 ``JevTagField`` is what a page declares in ``jev_tag_fields``; every attribute may be
 ``None`` meaning "use the ``WAGTAIL_JEV_*`` setting". ``JevTagField.bind`` resolves
-those defaults against a model and field name once, producing a ``BoundTagField``
-whose ``suggest`` runs the whole pipeline: candidate tags, minus existing tags,
-scored, thresholded and capped.
+those defaults against a model and field name once, producing a ``BoundTagField``.
+Its ``score`` asks Jev one Noul question per candidate tag ("does this article belong
+under tag X?") and returns every probability; ``suggest`` keeps those at or above the
+threshold, capped. Questions in a request run in parallel and cannot see each other,
+so each tag is judged independently and several may apply.
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Sequence
 
 from django.apps import apps
 from django.utils.module_loading import import_string
+from typesafe_sdk import Noul, NoulCriteria, TypeSafeClient
 
+from wagtail_jev import client as jev_client
 from wagtail_jev.article import Article
-from wagtail_jev.classifier import PromptTemplates, TagSuggestion, score_tags
 from wagtail_jev.settings import get_setting
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class TagSuggestion:
+    """One candidate tag with Jev's probability that it applies."""
+
+    name: str
+    probability: float
+
+    @property
+    def percent(self) -> int:
+        return round(self.probability * 100)
+
+
+@dataclass(frozen=True)
+class PromptTemplates:
+    """Templates for the per-tag question. ``{tag}`` is replaced with the tag name."""
+
+    instructions: str
+    criteria_true: str
+    criteria_false: str
+
+    @classmethod
+    def from_settings(cls) -> "PromptTemplates":
+        return cls(
+            instructions=get_setting("WAGTAIL_JEV_INSTRUCTIONS"),
+            criteria_true=get_setting("WAGTAIL_JEV_CRITERIA_TRUE"),
+            criteria_false=get_setting("WAGTAIL_JEV_CRITERIA_FALSE"),
+        )
 
 
 @dataclass(frozen=True)
@@ -64,19 +99,62 @@ class BoundTagField:
         """Candidate tag names for this field, minus the Article's existing tags."""
         return [c for c in self.candidate_source() if c not in article.existing_tags]
 
-    def suggest(self, article: Article, *, client=None) -> list[TagSuggestion]:
-        """Score the candidates against ``article``; keep those at or above the
-        threshold, capped at ``max_tags``, sorted high to low."""
-        scored = score_tags(
-            title=article.title,
-            body=article.body,
-            candidates=self.candidates(article),
-            existing_tags=article.existing_tags,
-            templates=self.templates,
-            client=client,
-        )
-        kept = [s for s in scored if s.probability >= self.threshold]
+    def score(self, article: Article, *, client: TypeSafeClient | None = None) -> list[TagSuggestion]:
+        """A probability for every candidate tag, unfiltered, sorted high to low.
+
+        One Noul question per candidate, sent in batches of ``WAGTAIL_JEV_BATCH_SIZE``.
+        Blank and duplicate candidates are dropped; no candidates means no request.
+        A ``client`` you pass is used as-is and left open; otherwise one is opened and
+        closed for this call.
+        """
+        candidates = list(dict.fromkeys(c for c in self.candidates(article) if c and c.strip()))
+        if not candidates:
+            return []
+
+        state = _state(article)
+        owns_client = client is None
+        client = client or jev_client.get_client()
+        results: list[TagSuggestion] = []
+        try:
+            for batch in _chunks(candidates, get_setting("WAGTAIL_JEV_BATCH_SIZE")):
+                questions = {f"tag_{i}": self._question(tag) for i, tag in enumerate(batch)}
+                response = client.system_one(state, questions)
+                logger.info("jev classified %d tags with %s", len(batch), response.model)
+                for i, tag in enumerate(batch):
+                    results.append(TagSuggestion(tag, response.nouls[f"tag_{i}"].noul))
+        finally:
+            if owns_client:
+                client.close()
+        results.sort(key=lambda s: s.probability, reverse=True)
+        return results
+
+    def suggest(self, article: Article, *, client: TypeSafeClient | None = None) -> list[TagSuggestion]:
+        """:meth:`score`, keeping only suggestions at or above the threshold, capped at
+        ``max_tags``."""
+        kept = [s for s in self.score(article, client=client) if s.probability >= self.threshold]
         return kept[: self.max_tags] if self.max_tags else kept
+
+    def _question(self, tag: str) -> Noul:
+        quoted = repr(tag)
+        return Noul(
+            instructions=self.templates.instructions.format(tag=quoted),
+            criteria=NoulCriteria(
+                true=self.templates.criteria_true.format(tag=quoted),
+                false=self.templates.criteria_false.format(tag=quoted),
+            ),
+        )
+
+
+def _state(article: Article) -> dict:
+    return {
+        "article": {"title": article.title, "body": article.body[: get_setting("WAGTAIL_JEV_MAX_CHARS")]},
+        "existing_tags": list(article.existing_tags),
+    }
+
+
+def _chunks(items: Sequence[str], size: int) -> Iterable[Sequence[str]]:
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
 
 
 def _default_candidate_source(model, field_name: str) -> Callable[[], Iterable[str]]:

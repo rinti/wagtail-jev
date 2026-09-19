@@ -7,9 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `BoundTagField.score(article)`: a probability for every candidate tag, unfiltered and sorted high to low. `suggest()` is `score()` with the threshold and cap applied.
+- `wagtail_jev.models` exports `PromptTemplates` and `TagSuggestion`.
+
 ### Changed
 
 - README rewritten in plainer language: shorter sentences, a lead-in for every code example, and fuller descriptions in the settings table.
+- `PromptTemplates` and `TagSuggestion` live in `wagtail_jev.tag_field`. Import them from there or from `wagtail_jev.models`.
+- `get_client()` lives in `wagtail_jev.client`.
+
+### Removed
+
+- `wagtail_jev.classifier`. Its `score_tags()` is now `BoundTagField.score()`; `build_state()` and `build_question()` are implementation details of the Tag field.
 
 ## [0.3.0] - 2026-09-19
 

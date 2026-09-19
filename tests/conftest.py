@@ -57,7 +57,7 @@ class FakeClient:
 def fake_client(monkeypatch):
     def make(probabilities=None, distributions=None):
         client = FakeClient(probabilities or {}, distributions)
-        monkeypatch.setattr("wagtail_jev.classifier.get_client", lambda: client)
+        monkeypatch.setattr("wagtail_jev.client.get_client", lambda: client)
         return client
 
     return make

@@ -5,11 +5,10 @@ from __future__ import annotations
 from typing import Mapping
 
 from wagtail_jev.article import Article
-from wagtail_jev.classifier import TagSuggestion
 from wagtail_jev.quality import BoundQuality, Level, Quality, Rating, rate
-from wagtail_jev.tag_field import BoundTagField, JevTagField
+from wagtail_jev.tag_field import BoundTagField, JevTagField, PromptTemplates, TagSuggestion
 
-__all__ = ["JevTagField", "JevTaggableMixin", "Level", "Quality"]
+__all__ = ["JevTagField", "JevTaggableMixin", "Level", "PromptTemplates", "Quality", "TagSuggestion"]
 
 
 class JevTaggableMixin:

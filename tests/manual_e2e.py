@@ -41,10 +41,10 @@ django.setup()
 from django.core.management import call_command, execute_from_command_line  # noqa: E402
 
 if not LIVE:
-    import wagtail_jev.classifier as classifier
+    import wagtail_jev.client as jev_client
     from tests.conftest import FakeClient
 
-    classifier.get_client = lambda: FakeClient(
+    jev_client.get_client = lambda: FakeClient(
         {"python": 0.93, "django": 0.71, "cooking": 0.05, "travel": 0.02,
          "finance": 0.1, "sport": 0.03, "calm": 0.9, "tense": 0.3, "joyful": 0.82,
          "nostalgic": 0.1},

@@ -77,8 +77,7 @@ Below, `tags` keeps the defaults. `feeling_tags` changes all three. `PromptTempl
 holds the question, in the same three parts as the prompt settings:
 
 ```python
-from wagtail_jev.classifier import PromptTemplates
-from wagtail_jev.models import JevTagField
+from wagtail_jev.models import JevTagField, PromptTemplates
 
 
 class ArticlePage(JevTaggableMixin, Page):
@@ -149,8 +148,8 @@ for s in tag_field.suggest(article):
     print(s.name, s.probability)
 ```
 
-If you want every tag's probability with no threshold or cap, use
-`wagtail_jev.classifier.score_tags` instead.
+If you want every tag's probability with no threshold or cap, call
+`tag_field.score(article)` instead.
 
 ## Qualities
 

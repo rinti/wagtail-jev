@@ -6,8 +6,7 @@ from wagtail import blocks
 from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
 
-from wagtail_jev.classifier import PromptTemplates
-from wagtail_jev.models import JevTagField, JevTaggableMixin
+from wagtail_jev.models import JevTagField, JevTaggableMixin, PromptTemplates
 from wagtail_jev.quality import Level, Quality
 from wagtail_jev.panels import JevRatingFieldPanel, JevRatingPanel, JevTagFieldPanel
 

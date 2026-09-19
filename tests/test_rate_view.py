@@ -114,7 +114,7 @@ def test_rate_returns_502_when_typesafe_fails(admin_client, monkeypatch, db):
         def system_one(self, state, questions, **kwargs):
             raise TypeSafeError("jev is down")
 
-    monkeypatch.setattr("wagtail_jev.classifier.get_client", lambda: FailingClient({}))
+    monkeypatch.setattr("wagtail_jev.client.get_client", lambda: FailingClient({}))
 
     response = admin_client.post(reverse("wagtail_jev:rate"), _form_data())
 
