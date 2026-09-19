@@ -59,6 +59,16 @@ class JevTaggableMixin:
             ) from None
         return quality.bind(cls, key)
 
+    @classmethod
+    def jev_bound_qualities(cls, *keys: str) -> list[BoundQuality]:
+        """The bound Qualities for ``keys``, or every declared Quality when none are given.
+
+        Always in declaration order, whatever order the keys are given in.
+        Raises :class:`LookupError` for an unknown key.
+        """
+        wanted = {key: cls.jev_quality(key) for key in keys or cls.jev_qualities}
+        return [wanted[key] for key in cls.jev_qualities if key in wanted]
+
     def jev_rate(self, *keys: str, client=None) -> list[Rating]:
         """Rate this page's saved Article on the Qualities ``keys``, or on every declared
         Quality when none are given, in one Jev request.
@@ -66,6 +76,4 @@ class JevTaggableMixin:
         Ratings come back in declaration order whatever order the keys are given in.
         Raises :class:`LookupError` for an unknown key before any request is made.
         """
-        wanted = {key: self.jev_quality(key) for key in keys or self.jev_qualities}
-        qualities = [wanted[key] for key in self.jev_qualities if key in wanted]
-        return rate(qualities, Article.from_page(self), client=client)
+        return rate(self.jev_bound_qualities(*keys), Article.from_page(self), client=client)

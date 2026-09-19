@@ -10,7 +10,7 @@ from wagtail.models import Page
 from wagtail_jev.classifier import PromptTemplates
 from wagtail_jev.models import JevTagField, JevTaggableMixin
 from wagtail_jev.quality import Level, Quality
-from wagtail_jev.panels import JevTagFieldPanel
+from wagtail_jev.panels import JevRatingPanel, JevTagFieldPanel
 
 
 class ArticleTag(TaggedItemBase):
@@ -74,4 +74,5 @@ class ArticlePage(JevTaggableMixin, Page):
         FieldPanel("body"),
         JevTagFieldPanel("tags"),
         JevTagFieldPanel("feeling_tags"),
+        JevRatingPanel(),
     ]

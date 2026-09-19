@@ -1,0 +1,15 @@
+{% load wagtailadmin_tags i18n %}
+<div data-controller="jev-rate"
+     data-jev-rate-url-value="{{ jev_url }}"
+     data-jev-rate-model-value="{{ jev_model }}"
+     data-jev-rate-keys-value="{{ jev_keys }}"
+     data-jev-rate-messages-value="{{ jev_messages }}">
+    <button type="button"
+            class="button button-small button-secondary bicolor button--icon"
+            data-action="jev-rate#rate"
+            data-jev-rate-target="button">
+        {% icon name="view" wrapped=1 %}{% trans "Rate with Jev" %}
+    </button>
+    <span class="w-ml-2 w-text-14 w-text-text-meta" data-jev-rate-target="status" aria-live="polite"></span>
+    <div class="w-mt-2 w-text-14" data-jev-rate-target="ratings" aria-live="polite"></div>
+</div>

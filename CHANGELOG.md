@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Quality` and `Level` (`wagtail_jev.quality`): an ordered rubric Jev rates an Article on, declared in `JevTaggableMixin.jev_qualities`.
 - `page.jev_rate(*keys)` returns a `Rating` per Quality from one Jev request; `jev_quality(key)` returns the bound Quality.
+- `JevRatingPanel` (`wagtail_jev.panels`): a "Rate with Jev" button that rates the editor's unsaved Article on all or some Qualities; Ratings are shown, never saved.
+- Admin endpoint `wagtail_jev:rate` returns the Ratings for the posted edit form.
+- `JevTaggableMixin.jev_bound_qualities(*keys)` returns the bound Qualities in declaration order.
 - `BoundTagField` (`wagtail_jev.tag_field`): one Tag field with settings resolved; `suggest(article)` runs the whole pipeline.
 - `JevTaggableMixin.jev_tag_field()` returns the bound Tag field for a page model.
 
