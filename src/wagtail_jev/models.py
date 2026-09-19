@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Mapping
 
+from wagtail_jev.article import Article
 from wagtail_jev.candidates import candidate_tag_names
 from wagtail_jev.classifier import PromptTemplates, TagSuggestion, suggest_tags
-from wagtail_jev.text import page_text
 
 
 @dataclass(frozen=True)
@@ -52,26 +52,28 @@ class JevTaggableMixin:
         config = cls.jev_tag_field_config(field_name)
         return candidate_tag_names(cls, field_name, config.candidates)
 
-    def jev_text(self) -> str:
-        return page_text(self, [f for f in self.jev_text_fields if f != "title"])
+    @classmethod
+    def jev_suggest_for_article(
+        cls, field_name: str, article: Article, **kwargs
+    ) -> list[TagSuggestion]:
+        """Score ``field_name``'s candidates against an :class:`Article`.
 
-    def jev_existing_tags(self, field_name: str) -> list[str]:
-        return [tag.name for tag in getattr(self, field_name).all()]
-
-    def jev_suggest_tags(self, field_name: str, **kwargs) -> list[TagSuggestion]:
-        config = self.jev_tag_field_config(field_name)
-        existing = self.jev_existing_tags(field_name)
-        candidates = [c for c in self.jev_candidates(field_name) if c not in existing]
+        Uses the field's :class:`JevTagField` for templates, threshold and cap unless
+        overridden in ``kwargs``; a ``client`` may be passed through to reuse a session.
+        """
+        config = cls.jev_tag_field_config(field_name)
+        candidates = [c for c in cls.jev_candidates(field_name) if c not in article.existing_tags]
         kwargs.setdefault("templates", config.templates)
         kwargs.setdefault("threshold", config.threshold)
         kwargs.setdefault("max_tags", config.max_tags)
         return suggest_tags(
-            title=self.title,
-            body=self.jev_text(),
+            title=article.title,
+            body=article.body,
             candidates=candidates,
-            existing_tags=existing,
+            existing_tags=article.existing_tags,
             **kwargs,
         )
 
-    def jev_add_tags(self, field_name: str, names) -> None:
-        getattr(self, field_name).add(*names)
+    def jev_suggest_tags(self, field_name: str, **kwargs) -> list[TagSuggestion]:
+        """Score ``field_name`` against this page's saved content."""
+        return self.jev_suggest_for_article(field_name, Article.from_page(self, field_name), **kwargs)

@@ -1,12 +1,10 @@
 from django.apps import apps
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from taggit.utils import parse_tags
 from typesafe_sdk import TypeSafeError
 from wagtail.admin.auth import require_admin_access
 
-from wagtail_jev.classifier import suggest_tags
-from wagtail_jev.forms import text_from_form_data
+from wagtail_jev.article import Article
 from wagtail_jev.models import JevTaggableMixin
 
 
@@ -28,30 +26,13 @@ def suggest(request):
 
     field_name = request.POST.get("jev_field", "")
     try:
-        config = model.jev_tag_field_config(field_name)
+        model.jev_tag_field_config(field_name)
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
-    title = request.POST.get("title", "")
-    body = text_from_form_data(
-        model,
-        [f for f in model.jev_text_fields if f != "title"],
-        request.POST,
-        request.FILES,
-    )
-    existing = parse_tags(request.POST.get(field_name, ""))
-    candidates = [c for c in model.jev_candidates(field_name) if c not in existing]
-
+    article = Article.from_form_data(model, field_name, request.POST, request.FILES)
     try:
-        suggestions = suggest_tags(
-            title=title,
-            body=body,
-            candidates=candidates,
-            existing_tags=existing,
-            templates=config.templates,
-            threshold=config.threshold,
-            max_tags=config.max_tags,
-        )
+        suggestions = model.jev_suggest_for_article(field_name, article)
     except TypeSafeError as exc:
         return JsonResponse({"error": str(exc)}, status=502)
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Article` (`wagtail_jev.article`): the title, body and existing tags Jev reads, built either from a saved page (`Article.from_page`) or from unsaved edit-form data (`Article.from_form_data`).
+- `JevTaggableMixin.jev_suggest_for_article()`: the single pipeline from tag-field config to suggestions, shared by the admin endpoint, `jev_suggest_tags()` and the management command.
+
+### Removed
+
+- `wagtail_jev.text` and `wagtail_jev.forms`; their logic lives inside `Article`.
+- `JevTaggableMixin.jev_text()`, `jev_existing_tags()` and `jev_add_tags()`.
+
 ## [0.1.0] - 2026-09-19
 
 ### Added

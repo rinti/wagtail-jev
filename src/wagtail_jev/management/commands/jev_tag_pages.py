@@ -64,7 +64,7 @@ class Command(BaseCommand):
                     self.stdout.write(f"[{page.id}] {page.title} / {field_name}: {summary}")
 
                     if options["apply"] and suggestions:
-                        page.jev_add_tags(field_name, [s.name for s in suggestions])
+                        getattr(page, field_name).add(*(s.name for s in suggestions))
                         changed = True
 
                 if changed:
