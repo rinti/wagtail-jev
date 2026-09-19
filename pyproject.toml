@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wagtail-jev"
+version = "0.1.0"
+description = "Classify Wagtail pages into tags with Jev, TypeSafe's System One model"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Andreas Bernacca", email = "andreas.bernacca@frojd.se" }]
+classifiers = [
+    "Framework :: Django",
+    "Framework :: Wagtail",
+    "Framework :: Wagtail :: 7",
+    "Framework :: Wagtail :: 8",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "wagtail>=6.3",
+    "typesafe-sdk>=0.7",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-django"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wagtail_jev"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+pythonpath = ["src", "."]
+testpaths = ["tests"]

@@ -1,0 +1,16 @@
+{% load wagtailadmin_tags i18n %}
+{% include "wagtailadmin/shared/field.html" with show_label=False help_text=self.help_text %}
+<div class="w-mt-2"
+     data-controller="jev-suggest"
+     data-jev-suggest-url-value="{{ jev_url }}"
+     data-jev-suggest-model-value="{{ jev_model }}"
+     data-jev-suggest-field-value="{{ self.field_name }}"
+     data-jev-suggest-messages-value="{{ jev_messages }}">
+    <button type="button"
+            class="button button-small button-secondary bicolor button--icon"
+            data-action="jev-suggest#suggest"
+            data-jev-suggest-target="button">
+        {% icon name="tag" wrapped=1 %}{% trans "Let Jev suggest tags" %}
+    </button>
+    <span class="w-ml-2 w-text-14 w-text-text-meta" data-jev-suggest-target="status" aria-live="polite"></span>
+</div>
