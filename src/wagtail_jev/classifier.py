@@ -2,8 +2,8 @@
 
 Each candidate tag becomes one Noul question ("does this article belong under
 tag X?"). Questions in a request run in parallel and cannot see each other, so
-a tag is judged independently and several may apply. Thresholding and ranking
-happen in code so policy changes need no re-inference.
+a tag is judged independently and several may apply. Ranking happens here;
+thresholding and capping are the Tag field's job, so policy changes need no re-inference.
 """
 
 from __future__ import annotations
@@ -53,8 +53,7 @@ class PromptTemplates:
         )
 
 
-def build_question(tag: str, templates: PromptTemplates | None = None) -> Noul:
-    templates = templates or PromptTemplates.from_settings()
+def build_question(tag: str, templates: PromptTemplates) -> Noul:
     quoted = repr(tag)
     return Noul(
         instructions=templates.instructions.format(tag=quoted),
@@ -83,18 +82,20 @@ def score_tags(
     title: str,
     body: str,
     candidates: Sequence[str],
+    templates: PromptTemplates,
     existing_tags: Sequence[str] = (),
     client: TypeSafeClient | None = None,
-    templates: PromptTemplates | None = None,
 ) -> list[TagSuggestion]:
-    """Return a probability for every candidate, unfiltered and sorted high to low."""
+    """Return a probability for every candidate, unfiltered and sorted high to low.
+
+    Thresholding and capping belong to the Tag field (``wagtail_jev.tag_field``).
+    """
     candidates = list(dict.fromkeys(c for c in candidates if c and c.strip()))
     if not candidates:
         return []
 
     body = body[: get_setting("WAGTAIL_JEV_MAX_CHARS")]
     state = build_state(title=title, body=body, existing_tags=existing_tags)
-    templates = templates or PromptTemplates.from_settings()
     owns_client = client is None
     client = client or get_client()
     results: list[TagSuggestion] = []
@@ -111,28 +112,3 @@ def score_tags(
     results.sort(key=lambda s: s.probability, reverse=True)
     return results
 
-
-def suggest_tags(
-    *,
-    title: str,
-    body: str,
-    candidates: Sequence[str],
-    existing_tags: Sequence[str] = (),
-    threshold: float | None = None,
-    max_tags: int | None = None,
-    client: TypeSafeClient | None = None,
-    templates: PromptTemplates | None = None,
-) -> list[TagSuggestion]:
-    """Score candidates and keep those at or above ``threshold``, capped at ``max_tags``."""
-    threshold = get_setting("WAGTAIL_JEV_THRESHOLD") if threshold is None else threshold
-    max_tags = get_setting("WAGTAIL_JEV_MAX_TAGS") if max_tags is None else max_tags
-    scored = score_tags(
-        title=title,
-        body=body,
-        candidates=candidates,
-        existing_tags=existing_tags,
-        client=client,
-        templates=templates,
-    )
-    kept = [s for s in scored if s.probability >= threshold]
-    return kept[:max_tags] if max_tags else kept

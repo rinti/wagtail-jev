@@ -43,3 +43,13 @@ def test_command_field_option_limits_to_one_field(page, fake_client):
 def test_command_rejects_unknown_field(page):
     with pytest.raises(CommandError, match="nope"):
         call_command("jev_tag_pages", "testapp.ArticlePage", "--field", "nope")
+
+
+def test_command_threshold_option_overrides_every_field(page, fake_client):
+    fake_client({"python": 0.9, "cooking": 0.1, "calm": 0.95})
+
+    call_command("jev_tag_pages", "testapp.ArticlePage", "--threshold", "0.92", "--apply")
+
+    latest = ArticlePage.objects.get(id=page.id).get_latest_revision_as_object()
+    assert list(latest.tags.all()) == []  # python at 0.9 no longer passes
+    assert [t.name for t in latest.feeling_tags.all()] == ["calm"]

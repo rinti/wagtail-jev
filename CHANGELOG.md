@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `BoundTagField` (`wagtail_jev.tag_field`): one Tag field with settings resolved; `suggest(article)` runs the whole pipeline.
+- `JevTaggableMixin.jev_tag_field()` returns the bound Tag field for a page model.
+
+### Changed
+
+- `jev_suggest_tags()` accepts only `client`; threshold and cap come from the Tag field.
+- `score_tags()` and `build_question()` require `templates`.
+- `JevTagField` lives in `wagtail_jev.tag_field`; `wagtail_jev.models` still exports it.
+
+### Removed
+
+- `classifier.suggest_tags()`, `wagtail_jev.candidates`.
+- `JevTaggableMixin.jev_tag_field_config()`, `jev_candidates()` and `jev_suggest_for_article()`.
+
 ## [0.2.0] - 2026-09-19
 
 ### Added

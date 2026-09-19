@@ -26,13 +26,13 @@ def suggest(request):
 
     field_name = request.POST.get("jev_field", "")
     try:
-        model.jev_tag_field_config(field_name)
+        tag_field = model.jev_tag_field(field_name)
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
     article = Article.from_form_data(model, field_name, request.POST, request.FILES)
     try:
-        suggestions = model.jev_suggest_for_article(field_name, article)
+        suggestions = tag_field.suggest(article)
     except TypeSafeError as exc:
         return JsonResponse({"error": str(exc)}, status=502)
 

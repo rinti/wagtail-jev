@@ -104,12 +104,27 @@ manage.py jev_tag_pages blog.ArticlePage --field feeling_tags   # default: all j
 
 ### In code
 
-```python
-from wagtail_jev.classifier import suggest_tags
+A saved page scores itself:
 
-for s in suggest_tags(title=..., body=..., candidates=["python", "django"]):
+```python
+for s in page.jev_suggest_tags("tags"):
     print(s.name, s.probability)
 ```
+
+Or take the Tag field and hand it any `Article`. `jev_tag_field()` resolves the
+field's `JevTagField` against the `WAGTAIL_JEV_*` settings once, and `suggest()`
+runs the whole pipeline: candidates minus existing tags, scored, thresholded, capped.
+
+```python
+from wagtail_jev.article import Article
+
+tag_field = ArticlePage.jev_tag_field("tags")
+article = Article(title="Django ORM tips", body="select_related and friends")
+for s in tag_field.suggest(article):
+    print(s.name, s.probability)
+```
+
+For raw probabilities with no threshold or cap, use `wagtail_jev.classifier.score_tags`.
 
 ## Settings
 

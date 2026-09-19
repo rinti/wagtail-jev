@@ -8,11 +8,14 @@ new draft revision, and with --publish it publishes that revision too.
 Without --field every field in the model's ``jev_tag_fields`` is processed.
 """
 
+from dataclasses import replace
+
 from django.apps import apps
 from django.core.management.base import BaseCommand, CommandError
 from typesafe_sdk import TypeSafeError
 
 from wagtail_jev import classifier
+from wagtail_jev.article import Article
 from wagtail_jev.models import JevTaggableMixin
 
 
@@ -33,18 +36,17 @@ class Command(BaseCommand):
         if not issubclass(model, JevTaggableMixin):
             raise CommandError(f"{options['model']} does not use JevTaggableMixin")
 
-        fields = options["fields"] or list(model.jev_tag_fields)
-        for name in fields:
-            try:
-                model.jev_tag_field_config(name)
-            except LookupError as exc:
-                raise CommandError(str(exc)) from None
-
         overrides = {}
         if options["threshold"] is not None:
             overrides["threshold"] = options["threshold"]
         if options["max_tags"] is not None:
             overrides["max_tags"] = options["max_tags"]
+
+        names = options["fields"] or list(model.jev_tag_fields)
+        try:
+            tag_fields = [replace(model.jev_tag_field(name), **overrides) for name in names]
+        except LookupError as exc:
+            raise CommandError(str(exc)) from None
 
         queryset = model.objects.live()
         if options["ids"]:
@@ -53,18 +55,20 @@ class Command(BaseCommand):
         with classifier.get_client() as client:
             for page in queryset.iterator():
                 changed = False
-                for field_name in fields:
+                for tag_field in tag_fields:
+                    label = f"[{page.id}] {page.title} / {tag_field.name}"
+                    article = Article.from_page(page, tag_field.name)
                     try:
-                        suggestions = page.jev_suggest_tags(field_name, client=client, **overrides)
+                        suggestions = tag_field.suggest(article, client=client)
                     except TypeSafeError as exc:
-                        self.stderr.write(f"[{page.id}] {page.title} / {field_name}: {exc}")
+                        self.stderr.write(f"{label}: {exc}")
                         continue
 
                     summary = ", ".join(f"{s.name} ({s.percent}%)" for s in suggestions) or "-"
-                    self.stdout.write(f"[{page.id}] {page.title} / {field_name}: {summary}")
+                    self.stdout.write(f"{label}: {summary}")
 
                     if options["apply"] and suggestions:
-                        getattr(page, field_name).add(*(s.name for s in suggestions))
+                        getattr(page, tag_field.name).add(*(s.name for s in suggestions))
                         changed = True
 
                 if changed:
