@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - README rewritten in plainer language: shorter sentences, a lead-in for every code example, and fuller descriptions in the settings table.
 - `PromptTemplates` and `TagSuggestion` live in `wagtail_jev.tag_field`. Import them from there or from `wagtail_jev.models`.
-- `get_client()` lives in `wagtail_jev.client`.
+- `get_client()` lives in `wagtail_jev.client`, alongside `ask()`, which sends one request and owns the connection's lifetime, and `clip()`, which applies `WAGTAIL_JEV_MAX_CHARS`. Tag fields and Qualities no longer open or close connections themselves.
+- Requests are logged once as "jev answered N questions" instead of separately per tag field and Quality.
 
 ### Removed
 

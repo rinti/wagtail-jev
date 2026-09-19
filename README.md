@@ -287,8 +287,9 @@ The last line reads the `intro` field from a saved page. `rate()` returns `None`
 the text is empty.
 
 To rate one text on several Qualities in one request, use
-`wagtail_jev.quality.rate(qualities, subject)`. Every rating function also takes a
-`client=` argument. Tests use it to pass in a fake Jev client.
+`wagtail_jev.quality.rate(qualities, subject)`. Every rating and scoring function also takes a
+`client=` argument to reuse one connection across several requests; the connection
+is otherwise opened and closed per call.
 
 Qualities have no threshold and no cap. They have no settings of their own. They use
 the same model, API key, timeout and max chars settings as tagging. They need no

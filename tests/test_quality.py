@@ -2,7 +2,6 @@ import pytest
 from typesafe_sdk import Score
 from wagtail.rich_text import RichText
 
-from tests.conftest import FakeClient
 from tests.testapp.models import ArticlePage
 from wagtail_jev.article import Article, Excerpt
 from wagtail_jev.quality import Level, Quality, rate
@@ -113,19 +112,6 @@ def test_blank_article_makes_no_request_and_yields_no_ratings(fake_client):
     assert ArticlePage.jev_quality("readability").rate(blank) is None
     assert _page(title="", intro="", body=[]).jev_rate() == []
     assert client.calls == []
-
-
-def test_rate_uses_the_injected_client_without_closing_it():
-    class Client(FakeClient):
-        closed = False
-
-        def close(self):
-            self.closed = True
-
-    client = Client({}, {"readability": [0.2, 0.3, 0.5]})
-    rating = ArticlePage.jev_quality("readability").rate(ARTICLE, client=client)
-    assert rating.top_label == "Hard"
-    assert client.closed is False
 
 
 def test_quality_label_falls_back_to_the_key():

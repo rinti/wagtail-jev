@@ -12,7 +12,6 @@ so each tag is judged independently and several may apply.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import Callable, Iterable, Sequence
 
@@ -20,12 +19,9 @@ from django.apps import apps
 from django.utils.module_loading import import_string
 from typesafe_sdk import Noul, NoulCriteria, TypeSafeClient
 
-from wagtail_jev import client as jev_client
+from wagtail_jev.client import ask, clip
 from wagtail_jev.article import Article
 from wagtail_jev.settings import get_setting
-
-logger = logging.getLogger(__name__)
-
 
 @dataclass(frozen=True)
 class TagSuggestion:
@@ -112,19 +108,12 @@ class BoundTagField:
             return []
 
         state = _state(article)
-        owns_client = client is None
-        client = client or jev_client.get_client()
         results: list[TagSuggestion] = []
-        try:
-            for batch in _chunks(candidates, get_setting("WAGTAIL_JEV_BATCH_SIZE")):
-                questions = {f"tag_{i}": self._question(tag) for i, tag in enumerate(batch)}
-                response = client.system_one(state, questions)
-                logger.info("jev classified %d tags with %s", len(batch), response.model)
-                for i, tag in enumerate(batch):
-                    results.append(TagSuggestion(tag, response.nouls[f"tag_{i}"].noul))
-        finally:
-            if owns_client:
-                client.close()
+        for batch in _chunks(candidates, get_setting("WAGTAIL_JEV_BATCH_SIZE")):
+            questions = {f"tag_{i}": self._question(tag) for i, tag in enumerate(batch)}
+            response = ask(state, questions, client=client)
+            for i, tag in enumerate(batch):
+                results.append(TagSuggestion(tag, response.nouls[f"tag_{i}"].noul))
         results.sort(key=lambda s: s.probability, reverse=True)
         return results
 
@@ -147,7 +136,7 @@ class BoundTagField:
 
 def _state(article: Article) -> dict:
     return {
-        "article": {"title": article.title, "body": article.body[: get_setting("WAGTAIL_JEV_MAX_CHARS")]},
+        "article": {"title": article.title, "body": clip(article.body)},
         "existing_tags": list(article.existing_tags),
     }
 

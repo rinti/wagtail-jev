@@ -13,17 +13,13 @@ level: the top level is the argmax of the distribution.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import Sequence, Union
 
 from typesafe_sdk import Score, TypeSafeClient
 
-from wagtail_jev import client as jev_client
+from wagtail_jev.client import ask, clip
 from wagtail_jev.article import Article, Excerpt
-from wagtail_jev.settings import get_setting
-
-logger = logging.getLogger(__name__)
 
 MIN_LEVELS = 2
 MAX_LEVELS = 10
@@ -144,14 +140,7 @@ def rate(
         return []
 
     questions = {quality.key: quality.question() for quality in qualities}
-    owns_client = client is None
-    client = client or jev_client.get_client()
-    try:
-        response = client.system_one(_state(subject), questions)
-    finally:
-        if owns_client:
-            client.close()
-    logger.info("jev rated %d qualities with %s", len(questions), response.model)
+    response = ask(_state(subject), questions, client=client)
 
     ratings = []
     for quality in qualities:
@@ -172,7 +161,6 @@ def _is_blank(subject: Subject) -> bool:
 def _state(subject: Subject) -> dict:
     """What Jev reads for a Rating, so unrelated material stays out: an Article's title and
     body with no existing tags, or an Excerpt's text alone."""
-    max_chars = get_setting("WAGTAIL_JEV_MAX_CHARS")
     if isinstance(subject, Excerpt):
-        return {"text": subject.text[:max_chars]}
-    return {"article": {"title": subject.title, "body": subject.body[:max_chars]}}
+        return {"text": clip(subject.text)}
+    return {"article": {"title": subject.title, "body": clip(subject.body)}}
