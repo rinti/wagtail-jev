@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-19
+
 ### Added
 
 - `Article` (`wagtail_jev.article`): the title, body and existing tags Jev reads, built either from a saved page (`Article.from_page`) or from unsaved edit-form data (`Article.from_form_data`).
@@ -27,5 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `jev_tag_pages` management command with `--field`, `--apply` and `--publish`.
 - `WAGTAIL_JEV_*` settings, including customizable prompt templates.
 
-[Unreleased]: https://github.com/rinti/wagtail-jev/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/rinti/wagtail-jev/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/rinti/wagtail-jev/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/rinti/wagtail-jev/releases/tag/v0.1.0
