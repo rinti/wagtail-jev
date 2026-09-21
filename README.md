@@ -13,6 +13,8 @@ One button press is one request to Jev, no matter how many tags or scales it cov
 For tags, Jev returns a probability for each one. Your code decides how high that
 probability must be, so you can tune it without asking Jev again.
 
+https://github.com/user-attachments/assets/e47ef5e2-2a48-4305-b2ed-d1cabf01ba55
+
 ## Install
 
 Install the package:
