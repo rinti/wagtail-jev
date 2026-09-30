@@ -107,3 +107,54 @@ def test_rating_panel_renders_only_its_key_subset(rf):
 
     assert 'data-jev-rate-keys-value="mood"' in html
     assert 'data-jev-rate-model-value="testapp.ArticlePage"' in html
+
+
+def _edit_page_html(client):
+    user = get_user_model().objects.create_superuser("admin", "a@example.com", "pw")
+    client.force_login(user)
+    root = Page.objects.get(depth=1)
+    page = root.add_child(instance=ArticlePage(title="Hello", slug="hello"))
+    response = client.get(reverse("wagtailadmin_pages:edit", args=[page.id]))
+    assert response.status_code == 200
+    return response.content.decode()
+
+
+@pytest.mark.django_db
+def test_with_laya_the_buttons_name_laya_and_warn_about_the_slow_start(client, settings):
+    settings.WAGTAIL_JEV_BACKEND = "laya"
+    html = _edit_page_html(client)
+    assert html.count("Let Laya suggest tags") == 2
+    assert "Rate Readability with Laya" in html
+    assert "Rate with Laya" in html
+    assert "Asking Laya" in html
+    assert "Loading Laya" in html  # json.dumps escapes the ellipsis, so check the text before it
+    assert "Let Jev" not in html and "Asking Jev" not in html
+
+
+@pytest.mark.django_db
+def test_with_jev_there_is_no_slow_start_message(client):
+    html = _edit_page_html(client)
+    assert "Let Jev suggest tags" in html
+    assert "Asking Jev" in html
+    assert "Loading Jev" not in html
+
+
+def _messages_in(html, controller):
+    import html as html_lib
+    import json
+    import re
+
+    raw = re.search(rf'data-jev-{controller}-messages-value="([^"]*)"', html).group(1)
+    return json.loads(html_lib.unescape(raw))
+
+
+@pytest.mark.django_db
+def test_with_jev_the_messages_are_the_same_as_before_in_the_same_order(client):
+    html = _edit_page_html(client)
+    assert list(_messages_in(html, "suggest").items()) == [
+        ("loading", "Asking Jev…"),
+        ("empty", "No tags passed the confidence threshold."),
+        ("added", "Added: "),
+        ("error", "Jev error: "),
+    ]
+    assert list(_messages_in(html, "rate")) == ["loading", "empty", "error"]

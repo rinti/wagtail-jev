@@ -26,7 +26,10 @@ class FakeClient:
             if isinstance(question, Score):
                 answers[key] = self._score_answer(key, question)
             else:
-                tag = next(t for t in self.probabilities if repr(t) in question.instructions)
+                # Jev quotes tag names, Laya does not; prefer the quoted match, then the longest bare one.
+                quoted = [t for t in self.probabilities if repr(t) in question.instructions]
+                bare = [t for t in self.probabilities if t in question.instructions]
+                tag = quoted[0] if quoted else max(bare, key=len)
                 answers[key] = NoulAnswer(type="noul", noul=self.probabilities[tag])
         return SystemOneResponse(
             model="jev-test", answers=answers, usage=Usage(input_tokens=1, output_tokens=1)

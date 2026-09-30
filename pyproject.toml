@@ -23,6 +23,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+laya = ["laya>=0.3.20"]
 test = ["pytest", "pytest-django"]
 
 [tool.hatch.build.targets.wheel]

@@ -5,3 +5,5 @@ from tests.settings import *  # noqa: F401,F403
 
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": "tests/test.db"}}
 WAGTAIL_JEV_API_KEY = os.environ.get("WAGTAIL_JEV_API_KEY")
+WAGTAIL_JEV_BACKEND = os.environ.get("WAGTAIL_JEV_BACKEND", "jev")
+WAGTAIL_JEV_LAYA_URL = os.environ.get("WAGTAIL_JEV_LAYA_URL")

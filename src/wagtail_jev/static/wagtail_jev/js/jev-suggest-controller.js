@@ -24,6 +24,12 @@ class JevSuggestController extends window.StimulusModule.Controller {
 
     this.buttonTarget.disabled = true;
     this.statusTarget.textContent = this.messagesValue.loading || "";
+    // Only for models that load on the first request after a restart (their messages carry `slow`).
+    const slowTimer = this.messagesValue.slow
+      ? window.setTimeout(() => {
+          this.statusTarget.textContent = this.messagesValue.slow;
+        }, 3000)
+      : null;
 
     fetch(this.urlValue, {
       method: "POST",
@@ -38,6 +44,7 @@ class JevSuggestController extends window.StimulusModule.Controller {
         response.json().then((json) => ({ ok: response.ok, json })),
       )
       .then(({ ok, json }) => {
+        window.clearTimeout(slowTimer);
         if (!ok) throw new Error(json.error || "Request failed");
         const tags = json.tags || [];
         if (!tags.length) {
@@ -56,6 +63,7 @@ class JevSuggestController extends window.StimulusModule.Controller {
           (this.messagesValue.error || "") + error.message;
       })
       .finally(() => {
+        window.clearTimeout(slowTimer);
         this.buttonTarget.disabled = false;
       });
   }

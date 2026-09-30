@@ -21,6 +21,7 @@ from typesafe_sdk import Noul, NoulCriteria, TypeSafeClient
 
 from wagtail_jev.client import ask, clip
 from wagtail_jev.article import Article
+from wagtail_jev.profiles import get_profile
 from wagtail_jev.settings import get_setting
 
 @dataclass(frozen=True)
@@ -124,7 +125,8 @@ class BoundTagField:
         return kept[: self.max_tags] if self.max_tags else kept
 
     def _question(self, tag: str) -> Noul:
-        quoted = repr(tag)
+        # Jev reads quoted tag names; on Laya, quoting added false positives in Swedish.
+        quoted = repr(tag) if get_profile().quote_tags else tag
         return Noul(
             instructions=self.templates.instructions.format(tag=quoted),
             criteria=NoulCriteria(
@@ -134,11 +136,8 @@ class BoundTagField:
         )
 
 
-def _state(article: Article) -> dict:
-    return {
-        "article": {"title": article.title, "body": clip(article.body)},
-        "existing_tags": list(article.existing_tags),
-    }
+def _state(article: Article):
+    return get_profile().tag_state(article, clip(article.body))
 
 
 def _chunks(items: Sequence[str], size: int) -> Iterable[Sequence[str]]:

@@ -82,3 +82,21 @@ def test_suggest_requires_admin(client, db):
 def test_suggest_rejects_non_jev_model(admin_client, db):
     response = admin_client.post(reverse("wagtail_jev:suggest"), {"jev_model": "wagtailcore.Page"})
     assert response.status_code == 400
+
+
+def test_laya_selected_but_not_installed_is_a_502_naming_the_extra(admin_client, tags, settings, monkeypatch):
+    import sys
+
+    from wagtail_jev import laya as laya_module
+
+    settings.WAGTAIL_JEV_BACKEND = "laya"
+    monkeypatch.setitem(sys.modules, "laya", None)
+    monkeypatch.setattr(laya_module, "_router", None)
+
+    response = admin_client.post(
+        reverse("wagtail_jev:suggest"),
+        {"jev_model": "testapp.ArticlePage", "jev_field": "tags", "title": "Python"},
+    )
+
+    assert response.status_code == 502
+    assert "wagtail-jev[laya]" in response.json()["error"]

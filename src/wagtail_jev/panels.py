@@ -7,6 +7,7 @@ from wagtail.admin.panels import FieldPanel, Panel
 
 from wagtail_jev.article import text_field
 from wagtail_jev.models import JevTaggableMixin
+from wagtail_jev.profiles import get_profile
 
 
 class JevTagFieldPanel(FieldPanel):
@@ -26,13 +27,14 @@ class JevTagFieldPanel(FieldPanel):
             context = super().get_context_data(parent_context)
             context["jev_url"] = reverse("wagtail_jev:suggest")
             context["jev_model"] = self.instance._meta.label
+            profile = get_profile()
+            context["jev_model_name"] = profile.name
             context["jev_messages"] = json.dumps(
-                {
-                    "loading": str(_("Asking Jev…")),
-                    "empty": str(_("No tags passed the confidence threshold.")),
-                    "added": str(_("Added: ")),
-                    "error": str(_("Jev error: ")),
-                }
+                _messages(
+                    profile,
+                    empty=_("No tags passed the confidence threshold."),
+                    added=_("Added: "),
+                )
             )
             return context
 
@@ -133,22 +135,35 @@ def _rating_context(model, keys, *, empty, field_name="") -> dict:
     ``keys`` is rendered as an explicit list so the "default to every Quality" choice is
     resolved at render time, not by the controller.
     """
+    profile = get_profile()
     qualities = model.jev_bound_qualities(*keys)
     if len(qualities) == 1:
-        button_label = _("Rate %(quality)s with Jev") % {"quality": qualities[0].label}
+        button_label = _("Rate %(quality)s with %(model)s") % {"quality": qualities[0].label, "model": profile.name}
     else:
-        button_label = _("Rate with Jev")
+        button_label = _("Rate with %(model)s") % {"model": profile.name}
     return {
         "jev_url": reverse("wagtail_jev:rate"),
         "jev_model": model._meta.label,
         "jev_field": field_name,
         "jev_keys": ",".join(quality.key for quality in qualities),
         "jev_button_label": button_label,
-        "jev_messages": json.dumps(
-            {
-                "loading": str(_("Asking Jev…")),
-                "empty": str(empty),
-                "error": str(_("Jev error: ")),
-            }
-        ),
+        "jev_messages": json.dumps(_messages(profile, empty=empty)),
     }
+
+
+def _messages(profile, **extra) -> dict:
+    """The controllers' status messages, naming the model. ``slow`` only exists for models
+    whose first request after a restart loads the model, and the controllers start their
+    slow-start timer only when it is there."""
+    # Same key order as before this module named the model, so Jev pages render unchanged.
+    messages = {
+        "loading": str(_("Asking %(model)s…") % {"model": profile.name}),
+        **{key: str(value) for key, value in extra.items()},
+        "error": str(_("%(model)s error: ") % {"model": profile.name}),
+    }
+    if profile.slow_start:
+        messages["slow"] = str(
+            _("Loading %(model)s… The first request after a restart can take up to a minute.")
+            % {"model": profile.name}
+        )
+    return messages
