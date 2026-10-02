@@ -140,6 +140,20 @@ def test_excerpt_text_is_truncated_to_max_chars(fake_client, settings):
     assert client.calls[0][0] == {"text": "01234"}
 
 
+def test_laya_rates_an_article_as_plain_text_cut_at_its_own_default(fake_client, settings):
+    settings.WAGTAIL_JEV_BACKEND = "laya"
+    client = fake_client(distributions={"readability": [0.7, 0.2, 0.1]})
+    ArticlePage.jev_quality("readability").rate(Article(title="T", body="x" * 2500))
+    assert client.calls[0][0] == "T\n\n" + "x" * 2000
+
+
+def test_laya_rates_an_excerpt_as_its_text_alone(fake_client, settings):
+    settings.WAGTAIL_JEV_BACKEND = "laya"
+    client = fake_client(distributions={"readability": [0.7, 0.2, 0.1]})
+    ArticlePage.jev_quality("readability").rate(Excerpt(text="Just the intro"))
+    assert client.calls[0][0] == "Just the intro"
+
+
 def test_blank_excerpt_makes_no_request_and_yields_no_ratings(fake_client):
     client = fake_client(distributions={"readability": [0.7, 0.2, 0.1]})
     blank = Excerpt(text=" \n")

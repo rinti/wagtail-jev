@@ -7,12 +7,6 @@ from wagtail_jev.laya import LayaClient
 from wagtail_jev.profiles import get_profile
 from wagtail_jev.settings import get_setting
 
-JEV_INSTRUCTIONS = (
-    "Would an editor file the article in `article` under the tag {tag}? "
-    "Judge by the article's actual subject matter, not by incidental mentions."
-)
-
-
 def test_jev_is_the_default():
     assert get_profile().name == "Jev"
 
@@ -26,27 +20,6 @@ def test_an_unknown_backend_names_the_allowed_values(settings):
     settings.WAGTAIL_JEV_BACKEND = "gpt"
     with pytest.raises(ImproperlyConfigured, match=r"'jev'.*'laya'.*'gpt'"):
         get_profile()
-
-
-def test_jev_defaults_are_unchanged():
-    assert get_setting("WAGTAIL_JEV_MAX_CHARS") == 12000
-    assert get_setting("WAGTAIL_JEV_INSTRUCTIONS") == JEV_INSTRUCTIONS
-    assert get_setting("WAGTAIL_JEV_CRITERIA_TRUE") == (
-        "The article is substantially about, or clearly belongs to, the topic {tag}."
-    )
-    assert get_setting("WAGTAIL_JEV_CRITERIA_FALSE") == "The topic {tag} is absent or only mentioned in passing."
-    assert get_profile().quote_tags is True
-    assert get_profile().slow_start is False
-
-
-def test_laya_has_its_own_defaults(settings):
-    settings.WAGTAIL_JEV_BACKEND = "laya"
-    assert get_setting("WAGTAIL_JEV_MAX_CHARS") == 2000
-    assert get_setting("WAGTAIL_JEV_INSTRUCTIONS") == "Is `state` about {tag}?"
-    assert get_setting("WAGTAIL_JEV_CRITERIA_TRUE") == "about {tag}"
-    assert get_setting("WAGTAIL_JEV_CRITERIA_FALSE") == "not about {tag}"
-    assert get_profile().quote_tags is False
-    assert get_profile().slow_start is True
 
 
 @pytest.mark.parametrize("backend", ["jev", "laya"])

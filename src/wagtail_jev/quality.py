@@ -20,6 +20,7 @@ from typesafe_sdk import Score, TypeSafeClient
 
 from wagtail_jev.client import ask, clip
 from wagtail_jev.article import Article, Excerpt
+from wagtail_jev.profiles import get_profile
 
 MIN_LEVELS = 2
 MAX_LEVELS = 10
@@ -158,9 +159,9 @@ def _is_blank(subject: Subject) -> bool:
     return not subject.title.strip() and not subject.body.strip()
 
 
-def _state(subject: Subject) -> dict:
-    """What Jev reads for a Rating, so unrelated material stays out: an Article's title and
-    body with no existing tags, or an Excerpt's text alone."""
+def _state(subject: Subject):
+    """What the model reads for a Rating, so unrelated material stays out: an Article's title
+    and body with no existing tags, or an Excerpt's text alone. The profile shapes it."""
     if isinstance(subject, Excerpt):
-        return {"text": clip(subject.text)}
-    return {"article": {"title": subject.title, "body": clip(subject.body)}}
+        return get_profile().rating_state(None, clip(subject.text))
+    return get_profile().rating_state(subject.title, clip(subject.body))

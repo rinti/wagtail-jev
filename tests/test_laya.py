@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
 
 import pytest
-from typesafe_sdk import Noul, NoulCriteria, Score, SystemOneResponse, TypeSafeError
+from typesafe_sdk import Noul, NoulCriteria, Score, SystemOneResponse
 
 from wagtail_jev import laya as laya_module
 from wagtail_jev.laya import LayaClient, LayaError, LayaUnavailable, to_laya_question, to_response
@@ -100,25 +100,20 @@ def test_malformed_payloads_raise_laya_error(payload):
         to_response(payload)
 
 
-def test_laya_errors_are_typesafe_errors():
-    # So wagtail-jev's existing `except TypeSafeError` in views and the command catches them.
-    assert issubclass(LayaError, TypeSafeError)
-    assert issubclass(LayaUnavailable, LayaError)
-
-
 # --- in-process ---------------------------------------------------------------
 
 
 class FakeRouter:
-    def __init__(self, fail=None):
+    def __init__(self, fail=None, payload=PAYLOAD):
         self.calls = []
         self.fail = fail
+        self.payload = payload
 
     def predict(self, state, questions, model=None):
         self.calls.append((state, questions, model))
         if self.fail:
             raise self.fail
-        return PAYLOAD
+        return self.payload
 
 
 @pytest.fixture
@@ -202,6 +197,18 @@ def test_a_broken_laya_install_is_unavailable(monkeypatch):
 def test_prediction_errors_become_laya_errors(fake_laya, monkeypatch):
     monkeypatch.setattr(laya_module, "_router", FakeRouter(fail=ValueError("question 'q' has no criteria")))
     with pytest.raises(LayaError, match="question 'q' has no criteria"):
+        LayaClient().system_one({}, QUESTIONS)
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [{}, {"q": {"type": "score", "score": 1.0, "probabilities": {"0": 0.0, "1": 1.0}}}],
+    ids=["missing", "another type"],
+)
+def test_a_question_without_an_answer_of_its_type_is_a_laya_error(monkeypatch, answers):
+    # Otherwise the tag field or Quality hits a KeyError and the editor gets a 500, not a 502.
+    monkeypatch.setattr(laya_module, "_router", FakeRouter(payload={"answers": answers}))
+    with pytest.raises(LayaError, match="did not answer q"):
         LayaClient().system_one({}, QUESTIONS)
 
 

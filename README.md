@@ -419,7 +419,8 @@ prompts this short.
 **Rating on Laya is experimental.** In our test on 10 pages (7 English, 3 Swedish), 10 of
 20 Ratings matched an editor's level exactly. Mood was mostly right in English, but
 readability came out "Medium" for 9 of the 10 pages. Check Ratings against your own
-judgement before relying on them.
+judgement before relying on them. Laya reads Ratings as plain text too: the title and
+body, or a field's text alone.
 
 If Laya is selected but not installed, cannot start, or its server cannot be reached,
 editors see an error naming the problem, and `jev_tag_pages` stops at once.

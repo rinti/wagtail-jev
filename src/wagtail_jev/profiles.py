@@ -2,14 +2,15 @@
 
 A :class:`ModelProfile` holds everything model-specific: the name editors see, how to open a
 client, the defaults of the model-specific settings (the tag prompt and the text cut-off),
-how an Article becomes tag state, whether tag names are quoted, and whether the first
-request after a restart is slow. ``WAGTAIL_JEV_BACKEND`` picks one; everything else in
-wagtail-jev is shared.
+how an Article becomes tag state, how an Article or an Excerpt becomes rating state,
+whether tag names are quoted, and whether the first request after a restart is slow.
+``WAGTAIL_JEV_BACKEND`` picks one; everything else in wagtail-jev is shared.
 
 Laya's differences were measured on real content: with Jev's prompt and dict state it barely
 told relevant from irrelevant tags, while a short question about plain text, with unquoted
 tag names, separated them in English and Swedish. It also reads only about 2,000
-characters of state.
+characters of state. Laya reads Ratings as plain text too, so every Laya request has the
+same kind of state.
 
 This is internal for now: the seam a public model interface can grow from.
 """
@@ -31,6 +32,7 @@ class ModelProfile:
     make_client: Callable[[], Any]
     defaults: Mapping[str, Any]
     tag_state: Callable[[Any, str], Any]  # (article, clipped body) -> state
+    rating_state: Callable[[str | None, str], Any]  # (title, None for an excerpt; clipped text) -> state
     quote_tags: bool
     slow_start: bool = False
 
@@ -64,6 +66,16 @@ def _laya_tag_state(article, body: str) -> str:
     return f"{article.title}\n\n{body}"
 
 
+def _jev_rating_state(title: str | None, text: str) -> dict:
+    if title is None:
+        return {"text": text}
+    return {"article": {"title": title, "body": text}}
+
+
+def _laya_rating_state(title: str | None, text: str) -> str:
+    return text if title is None else f"{title}\n\n{text}"
+
+
 JEV = ModelProfile(
     name="Jev",
     make_client=_jev_client,
@@ -77,6 +89,7 @@ JEV = ModelProfile(
         "WAGTAIL_JEV_CRITERIA_FALSE": "The topic {tag} is absent or only mentioned in passing.",
     },
     tag_state=_jev_tag_state,
+    rating_state=_jev_rating_state,
     quote_tags=True,
 )
 
@@ -90,6 +103,7 @@ LAYA = ModelProfile(
         "WAGTAIL_JEV_CRITERIA_FALSE": "not about {tag}",
     },
     tag_state=_laya_tag_state,
+    rating_state=_laya_rating_state,
     quote_tags=False,
     slow_start=True,
 )

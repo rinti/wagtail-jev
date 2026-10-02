@@ -71,7 +71,7 @@ class LayaClient:
     def system_one(self, state: Any, questions: Mapping[str, Any], **kwargs) -> SystemOneResponse:
         laya_questions = {qid: to_laya_question(question) for qid, question in questions.items()}
         payload = self._post(state, laya_questions) if self.url else self._predict(state, laya_questions)
-        return to_response(payload)
+        return _require_answers(laya_questions, to_response(payload))
 
     def _predict(self, state: Any, questions: dict) -> dict:
         with _lock:
@@ -143,6 +143,19 @@ def to_response(payload: dict) -> SystemOneResponse:
         )
     except (KeyError, TypeError, ValueError, AttributeError) as exc:  # pydantic's ValidationError is a ValueError
         raise LayaError(f"Laya sent an answer wagtail-jev cannot read: {exc!r}") from exc
+
+
+def _require_answers(questions: dict, response: SystemOneResponse) -> SystemOneResponse:
+    """``response``, once it is known to answer every question with an answer of its type, so
+    tag fields and Qualities can look their answers up."""
+    unanswered = [
+        qid
+        for qid, question in questions.items()
+        if getattr(response.answers.get(qid), "type", None) != question.get("type")
+    ]
+    if unanswered:
+        raise LayaError(f"Laya did not answer {', '.join(unanswered)}")
+    return response
 
 
 def _detail(exc: urllib.error.HTTPError) -> str:
