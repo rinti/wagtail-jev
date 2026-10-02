@@ -2,9 +2,12 @@
 
     python tests/manual_e2e.py          # stubbed Jev, no network
     python tests/manual_e2e.py --live   # real Jev; reads WAGTAIL_API_KEY / TYPESAFE_API_KEY from .env
+    python tests/manual_e2e.py --laya                             # real Laya in this process
+    python tests/manual_e2e.py --laya-url http://127.0.0.1:8000   # a running `python -m laya.serve`
+    python tests/manual_e2e.py --port 8766                        # serve the admin on another port
 
 Prints the Ratings of the seeded page on every declared Quality, then serves the admin.
-Log in at http://127.0.0.1:8765/admin/ as admin / pw and edit "Django tips".
+Log in at http://127.0.0.1:<port>/admin/ as admin / pw and edit "Django tips".
 """
 
 import os
@@ -13,6 +16,13 @@ from pathlib import Path
 
 sys.path[:0] = ["src", "."]
 LIVE = "--live" in sys.argv
+LAYA_URL = sys.argv[sys.argv.index("--laya-url") + 1] if "--laya-url" in sys.argv else None
+LAYA = "--laya" in sys.argv or LAYA_URL is not None
+PORT = sys.argv[sys.argv.index("--port") + 1] if "--port" in sys.argv else "8765"
+if LAYA:
+    os.environ["WAGTAIL_JEV_BACKEND"] = "laya"
+    if LAYA_URL:
+        os.environ["WAGTAIL_JEV_LAYA_URL"] = LAYA_URL
 
 
 def load_dotenv(path=Path(".env")):
@@ -40,7 +50,7 @@ django.setup()
 
 from django.core.management import call_command, execute_from_command_line  # noqa: E402
 
-if not LIVE:
+if not LIVE and not LAYA:
     import wagtail_jev.client as jev_client
     from tests.conftest import FakeClient
 
@@ -76,12 +86,12 @@ page = root.add_child(
         "prefetch_related, only(), annotate() and database indexes.</p>",
     )
 )
-print("Mode:", "LIVE Jev" if LIVE else "stubbed Jev")
+print("Mode:", f"Laya server at {LAYA_URL}" if LAYA_URL else "Laya in this process" if LAYA else "LIVE Jev" if LIVE else "stubbed Jev")
 print("Ratings for", repr(page.title))
 for rating in page.jev_rate():
     distribution = ", ".join(
         f"{level.label} {round(p * 100)}%" for level, p in zip(rating.levels, rating.probabilities)
     )
     print(f"  {rating.key}: {rating.top_label} ({rating.percent}%)  [{distribution}]")
-print(f"Edit page: http://127.0.0.1:8765/admin/pages/{page.id}/edit/  (admin / pw)")
-execute_from_command_line(["manage", "runserver", "8765", "--noreload"])
+print(f"Edit page: http://127.0.0.1:{PORT}/admin/pages/{page.id}/edit/  (admin / pw)")
+execute_from_command_line(["manage", "runserver", PORT, "--noreload"])

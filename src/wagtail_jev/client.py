@@ -1,7 +1,7 @@
 """The Jev connection: everything about talking to Jev that is not a domain question.
 
-:func:`ask` sends one request. It opens a ``TypeSafeClient`` from the ``WAGTAIL_JEV_*``
-settings and closes it afterwards, unless the caller passes a ``client`` of its own,
+:func:`ask` sends one request. It opens a client for the configured model (see
+:mod:`wagtail_jev.profiles`) and closes it afterwards, unless the caller passes a ``client`` of its own,
 which is used as-is and left open so one connection can serve many requests.
 :func:`clip` cuts text to ``WAGTAIL_JEV_MAX_CHARS`` so requests stay inside Jev's
 token budget. Tests replace :func:`get_client` to substitute a fake.
@@ -14,17 +14,16 @@ from typing import Mapping
 
 from typesafe_sdk import SystemOneResponse, TypeSafeClient
 
+from wagtail_jev.profiles import get_profile
 from wagtail_jev.settings import get_setting
 
 logger = logging.getLogger(__name__)
 
 
 def get_client() -> TypeSafeClient:
-    return TypeSafeClient(
-        api_key=get_setting("WAGTAIL_JEV_API_KEY"),
-        model=get_setting("WAGTAIL_JEV_MODEL"),
-        timeout=get_setting("WAGTAIL_JEV_TIMEOUT"),
-    )
+    """A client for the model ``WAGTAIL_JEV_BACKEND`` names: a ``TypeSafeClient`` for Jev,
+    a :class:`~wagtail_jev.laya.LayaClient` with the same surface for Laya."""
+    return get_profile().make_client()
 
 
 def ask(

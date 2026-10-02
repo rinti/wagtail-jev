@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `BoundTagField.score(article)`: a probability for every candidate tag, unfiltered and sorted high to low. `suggest()` is `score()` with the threshold and cap applied.
 - `wagtail_jev.models` exports `PromptTemplates` and `TagSuggestion`.
+- Laya as an alternative model: `pip install "wagtail-jev[laya]"` and `WAGTAIL_JEV_BACKEND = "laya"` run the open-source Laya model in-process, or on a `python -m laya.serve` server with `WAGTAIL_JEV_LAYA_URL` / `WAGTAIL_JEV_LAYA_API_KEY`. `WAGTAIL_JEV_LAYA_MODEL` picks a checkpoint. Laya gets its own defaults for the tag prompt, the state (plain text), tag quoting (none) and `WAGTAIL_JEV_MAX_CHARS` (2000); Jev's are unchanged. The editor buttons name the active model, and Laya shows a "Loading Laya…" message when the first request after a restart is slow. `jev_tag_pages` stops at once when Laya cannot be reached or started.
 
 ### Changed
 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PromptTemplates` and `TagSuggestion` live in `wagtail_jev.tag_field`. Import them from there or from `wagtail_jev.models`.
 - `get_client()` lives in `wagtail_jev.client`, alongside `ask()`, which sends one request and owns the connection's lifetime, and `clip()`, which applies `WAGTAIL_JEV_MAX_CHARS`. Tag fields and Qualities no longer open or close connections themselves.
 - Requests are logged once as "jev answered N questions" instead of separately per tag field and Quality.
+- Leaving the prompt settings or `WAGTAIL_JEV_MAX_CHARS` unset now means "the model's default". For Jev the defaults are unchanged, and `WAGTAIL_JEV_MAX_CHARS = None` still means no cut-off.
 
 ### Removed
 

@@ -53,3 +53,44 @@ def test_command_threshold_option_overrides_every_field(page, fake_client):
     latest = ArticlePage.objects.get(id=page.id).get_latest_revision_as_object()
     assert list(latest.tags.all()) == []  # python at 0.9 no longer passes
     assert [t.name for t in latest.feeling_tags.all()] == ["calm"]
+
+
+class _RaisingClient:
+    def __init__(self, error):
+        self.error = error
+        self.calls = 0
+
+    def system_one(self, state, questions, **kwargs):
+        self.calls += 1
+        raise self.error
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        pass
+
+
+def test_command_stops_at_once_when_laya_is_unavailable(page, monkeypatch):
+    from wagtail_jev.laya import LayaUnavailable
+
+    client = _RaisingClient(LayaUnavailable("Could not reach Laya at http://laya:8000/v1/systemone"))
+    monkeypatch.setattr("wagtail_jev.client.get_client", lambda: client)
+
+    with pytest.raises(CommandError, match="Could not reach Laya"):
+        call_command("jev_tag_pages", "testapp.ArticlePage")
+    assert client.calls == 1
+
+
+def test_command_skips_a_page_on_other_laya_errors(page, monkeypatch, capsys):
+    from wagtail_jev.laya import LayaError
+
+    client = _RaisingClient(LayaError("Laya server answered 422: question 'tag_0' has no criteria"))
+    monkeypatch.setattr("wagtail_jev.client.get_client", lambda: client)
+
+    call_command("jev_tag_pages", "testapp.ArticlePage")
+
+    assert capsys.readouterr().err.count("422") == 2  # one line per tag field, no crash

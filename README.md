@@ -304,11 +304,12 @@ also be set per tag field, as shown in "Several tag fields" above.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
+| `WAGTAIL_JEV_BACKEND` | `"jev"` | Which model answers: `"jev"` or `"laya"`. See "Using Laya instead of Jev" |
 | `WAGTAIL_JEV_API_KEY` | `None` | Your TypeSafe API key. If unset, the `TYPESAFE_API_KEY` environment variable is used |
 | `WAGTAIL_JEV_MODEL` | `"jev-latest"` | Which Jev model to use. Pin a specific version once your threshold is tuned |
 | `WAGTAIL_JEV_THRESHOLD` | `0.6` | A tag is suggested only if its probability is at least this |
 | `WAGTAIL_JEV_MAX_TAGS` | `None` | Suggest at most this many tags per page |
-| `WAGTAIL_JEV_MAX_CHARS` | `12000` | Only the first this-many characters of the page text are sent to Jev |
+| `WAGTAIL_JEV_MAX_CHARS` | `12000` (Laya: `2000`) | Only the first this-many characters of the page text are sent to Jev |
 | `WAGTAIL_JEV_BATCH_SIZE` | `40` | How many tags to ask about in one request |
 | `WAGTAIL_JEV_TAG_MODEL` | `"taggit.Tag"` | The model whose rows are the tags Jev can choose from |
 | `WAGTAIL_JEV_CANDIDATES` | `None` | Dotted path to a function that returns tag names. Replaces the tag model |
@@ -331,6 +332,8 @@ WAGTAIL_JEV_CRITERIA_TRUE = "The article is substantially about, or clearly belo
 WAGTAIL_JEV_CRITERIA_FALSE = "The topic {tag} is absent or only mentioned in passing."
 ```
 
+These are Jev's defaults. Laya has its own; see "Using Laya instead of Jev".
+
 `{tag}` stands for the tag name. `article` is the page, with a `title` and a `body`.
 `existing_tags` lists the tags the page already has. You can use all three in your own
 wording.
@@ -349,6 +352,77 @@ Compare the output with the tags your editors would choose.
 
 Text in other languages than English works, but less accurately. Test on your own
 content.
+
+## Using Laya instead of Jev
+
+[Laya](https://huggingface.co/convaiinnovations/laya) is an open-source decision model that
+answers the same kind of questions as Jev. It runs inside Django or on a server of your own,
+so there is no API key, no per-request cost, and page text never leaves your
+infrastructure. Everything above works the same; the buttons say "Laya" instead of "Jev".
+
+**Inside Django** (each web worker loads its own copy of the model):
+
+```sh
+pip install "wagtail-jev[laya]"
+```
+
+```python
+WAGTAIL_JEV_BACKEND = "laya"
+```
+
+The model downloads from Hugging Face on first use and loads on the first button press
+after a restart. That press can take up to a minute; the button says so after three
+seconds. Later presses take well under a second on a GPU and a few seconds on a CPU. If
+your web server kills slow requests (gunicorn's default is 30 seconds), raise its timeout
+or use a shared server.
+
+**On a shared server** (one model in memory, on a GPU machine if you have one):
+
+```sh
+# on the Laya machine
+pip install "laya[serve]"
+LAYA_API_KEY=choose-a-secret python -m laya.serve     # listens on :8000
+```
+
+```python
+WAGTAIL_JEV_BACKEND = "laya"
+WAGTAIL_JEV_LAYA_URL = "http://laya.internal:8000"
+WAGTAIL_JEV_LAYA_API_KEY = "choose-a-secret"   # or the LAYA_API_KEY environment variable
+```
+
+`laya.serve` accepts at most 64 questions per request, so keep `WAGTAIL_JEV_BATCH_SIZE`
+at 64 or below (the default is 40).
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `WAGTAIL_JEV_BACKEND` | `"jev"` | `"jev"` or `"laya"` |
+| `WAGTAIL_JEV_LAYA_URL` | `None` | A Laya server's base URL. If unset, Laya runs inside Django |
+| `WAGTAIL_JEV_LAYA_API_KEY` | `None` | The server's `LAYA_API_KEY`. If unset, the `LAYA_API_KEY` environment variable is used |
+| `WAGTAIL_JEV_LAYA_MODEL` | `None` | `"english"` or `"multilingual"`. If unset, Laya picks one per request by language |
+
+`WAGTAIL_JEV_TIMEOUT` also applies to Laya server requests. `WAGTAIL_JEV_API_KEY` and
+`WAGTAIL_JEV_MODEL` are for Jev only.
+
+**Laya has its own defaults**, measured on real English and Swedish pages. With Jev's
+prompt, Laya barely told relevant tags from irrelevant ones. These worked far better:
+
+- the page is sent as plain text (title, blank line, body) instead of the `article` and
+  `existing_tags` keys;
+- tag names are not quoted;
+- the default prompt is ``Is `state` about {tag}?`` / `about {tag}` / `not about {tag}`;
+- only the first 2,000 characters are sent (`WAGTAIL_JEV_MAX_CHARS`), since Laya does not
+  read much further.
+
+Your own prompt and `WAGTAIL_JEV_MAX_CHARS` settings still override these. Keep Laya
+prompts this short.
+
+**Rating on Laya is experimental.** In our test on 10 pages (7 English, 3 Swedish), 10 of
+20 Ratings matched an editor's level exactly. Mood was mostly right in English, but
+readability came out "Medium" for 9 of the 10 pages. Check Ratings against your own
+judgement before relying on them.
+
+If Laya is selected but not installed, cannot start, or its server cannot be reached,
+editors see an error naming the problem, and `jev_tag_pages` stops at once.
 
 ## Development
 
@@ -372,3 +446,7 @@ Log in at http://127.0.0.1:8765/admin/ with the username `admin` and the passwor
 
 Add `--live` to use the real Jev. The script reads the API key from `WAGTAIL_API_KEY`
 or `TYPESAFE_API_KEY` in your `.env` file.
+
+Add `--laya` to use Laya in the same process (needs `pip install -e ".[laya,test]"`), or
+`--laya-url http://127.0.0.1:8000` to use a running `python -m laya.serve`. `--port 8766`
+serves the admin on another port.

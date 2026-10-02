@@ -166,3 +166,25 @@ def test_suggest_never_asks_about_existing_tags(fake_client):
 
 def fixed_candidates():
     return ["alpha", "beta"]
+
+
+def test_laya_gets_plain_text_state_unquoted_tags_and_its_own_prompt(fake_client, settings):
+    settings.WAGTAIL_JEV_BACKEND = "laya"
+    client = fake_client({"python": 0.9})
+    article = Article(title="Django ORM tips", body="x" * 2500, existing_tags=("orm",))
+
+    JevTagField(candidates=lambda: ["python"]).bind(ArticlePage, "tags").score(article)
+
+    state, questions = client.calls[0]
+    assert state == "Django ORM tips\n\n" + "x" * 2000
+    question = questions["tag_0"]
+    assert question.instructions == "Is `state` about python?"
+    assert question.criteria == {"true": "about python", "false": "not about python"}
+
+
+def test_jev_still_gets_the_dict_state_and_quoted_tags(fake_client):
+    client = fake_client({"python": 0.9})
+    JevTagField(candidates=lambda: ["python"]).bind(ArticlePage, "tags").score(ARTICLE)
+    state, questions = client.calls[0]
+    assert state == {"article": {"title": "Django ORM tips", "body": "select_related and friends"}, "existing_tags": []}
+    assert "'python'" in questions["tag_0"].instructions

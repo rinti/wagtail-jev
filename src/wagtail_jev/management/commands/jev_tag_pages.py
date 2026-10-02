@@ -6,6 +6,7 @@
 Without --apply it only prints suggestions. With --apply it adds tags to a
 new draft revision, and with --publish it publishes that revision too.
 Without --field every field in the model's ``jev_tag_fields`` is processed.
+If Laya is selected but cannot be reached or started, the command stops at once.
 """
 
 from dataclasses import replace
@@ -16,6 +17,7 @@ from typesafe_sdk import TypeSafeError
 
 from wagtail_jev import client as jev_client
 from wagtail_jev.article import Article
+from wagtail_jev.laya import LayaUnavailable
 from wagtail_jev.models import JevTaggableMixin
 
 
@@ -60,6 +62,9 @@ class Command(BaseCommand):
                     article = Article.from_page(page, tag_field.name)
                     try:
                         suggestions = tag_field.suggest(article, client=client)
+                    except LayaUnavailable as exc:
+                        # Every further page would wait out the same failure; stop now.
+                        raise CommandError(str(exc)) from None
                     except TypeSafeError as exc:
                         self.stderr.write(f"{label}: {exc}")
                         continue

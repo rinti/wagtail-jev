@@ -10,7 +10,7 @@
             class="button button-small button-secondary bicolor button--icon"
             data-action="jev-suggest#suggest"
             data-jev-suggest-target="button">
-        {% icon name="tag" wrapped=1 %}{% trans "Let Jev suggest tags" %}
+        {% icon name="tag" wrapped=1 %}{% blocktrans with model=jev_model_name %}Let {{ model }} suggest tags{% endblocktrans %}
     </button>
     <span class="w-ml-2 w-text-14 w-text-text-meta" data-jev-suggest-target="status" aria-live="polite"></span>
 </div>
