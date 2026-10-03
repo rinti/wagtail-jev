@@ -12,6 +12,8 @@ tag names, separated them in English and Swedish. It also reads only about 2,000
 characters of state. Laya reads Ratings as plain text too, so every Laya request has the
 same kind of state.
 
+Clef takes Jev's requests unchanged, so it starts from Jev's prompt, state and quoting.
+
 This is internal for now: the seam a public model interface can grow from.
 """
 
@@ -54,6 +56,17 @@ def _laya_client():
         url=get_setting("WAGTAIL_JEV_LAYA_URL"),
         api_key=get_setting("WAGTAIL_JEV_LAYA_API_KEY") or os.environ.get("LAYA_API_KEY"),
         model=get_setting("WAGTAIL_JEV_LAYA_MODEL"),
+        timeout=get_setting("WAGTAIL_JEV_TIMEOUT"),
+    )
+
+
+def _clef_client():
+    from wagtail_jev.clef import make_client
+
+    return make_client(
+        account_id=get_setting("WAGTAIL_JEV_CLEF_ACCOUNT_ID") or os.environ.get("CLOUDFLARE_ACCOUNT_ID"),
+        api_token=get_setting("WAGTAIL_JEV_CLEF_API_TOKEN") or os.environ.get("CLOUDFLARE_API_TOKEN"),
+        model=get_setting("WAGTAIL_JEV_CLEF_MODEL"),
         timeout=get_setting("WAGTAIL_JEV_TIMEOUT"),
     )
 
@@ -108,7 +121,16 @@ LAYA = ModelProfile(
     slow_start=True,
 )
 
-PROFILES = {"jev": JEV, "laya": LAYA}
+CLEF = ModelProfile(
+    name="Clef",
+    make_client=_clef_client,
+    defaults=JEV.defaults,
+    tag_state=_jev_tag_state,
+    rating_state=_jev_rating_state,
+    quote_tags=True,
+)
+
+PROFILES = {"jev": JEV, "laya": LAYA, "clef": CLEF}
 
 
 def get_profile() -> ModelProfile:

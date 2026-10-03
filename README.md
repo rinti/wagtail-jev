@@ -304,7 +304,7 @@ also be set per tag field, as shown in "Several tag fields" above.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `WAGTAIL_JEV_BACKEND` | `"jev"` | Which model answers: `"jev"` or `"laya"`. See "Using Laya instead of Jev" |
+| `WAGTAIL_JEV_BACKEND` | `"jev"` | Which model answers: `"jev"`, `"laya"` or `"clef"`. See "Using Laya instead of Jev" and "Using Clef instead of Jev" |
 | `WAGTAIL_JEV_API_KEY` | `None` | Your TypeSafe API key. If unset, the `TYPESAFE_API_KEY` environment variable is used |
 | `WAGTAIL_JEV_MODEL` | `"jev-latest"` | Which Jev model to use. Pin a specific version once your threshold is tuned |
 | `WAGTAIL_JEV_THRESHOLD` | `0.6` | A tag is suggested only if its probability is at least this |
@@ -332,7 +332,7 @@ WAGTAIL_JEV_CRITERIA_TRUE = "The article is substantially about, or clearly belo
 WAGTAIL_JEV_CRITERIA_FALSE = "The topic {tag} is absent or only mentioned in passing."
 ```
 
-These are Jev's defaults. Laya has its own; see "Using Laya instead of Jev".
+These are Jev's defaults, and Clef's. Laya has its own; see "Using Laya instead of Jev".
 
 `{tag}` stands for the tag name. `article` is the page, with a `title` and a `body`.
 `existing_tags` lists the tags the page already has. You can use all three in your own
@@ -395,7 +395,7 @@ at 64 or below (the default is 40).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `WAGTAIL_JEV_BACKEND` | `"jev"` | `"jev"` or `"laya"` |
+| `WAGTAIL_JEV_BACKEND` | `"jev"` | `"jev"`, `"laya"` or `"clef"` |
 | `WAGTAIL_JEV_LAYA_URL` | `None` | A Laya server's base URL. If unset, Laya runs inside Django |
 | `WAGTAIL_JEV_LAYA_API_KEY` | `None` | The server's `LAYA_API_KEY`. If unset, the `LAYA_API_KEY` environment variable is used |
 | `WAGTAIL_JEV_LAYA_MODEL` | `None` | `"english"` or `"multilingual"`. If unset, Laya picks one per request by language |
@@ -425,6 +425,34 @@ body, or a field's text alone.
 If Laya is selected but not installed, cannot start, or its server cannot be reached,
 editors see an error naming the problem, and `jev_tag_pages` stops at once.
 
+## Using Clef instead of Jev
+
+[Clef](https://huggingface.co/Cloudflare/clef) is Cloudflare's decision model, hosted on
+Workers AI. It takes the same questions as Jev and answers in the same form, so everything
+above works the same; the buttons say "Clef" instead of "Jev". You pay Cloudflare instead
+of TypeSafe.
+
+You need your Cloudflare account ID and an API token with Workers AI permission:
+
+```python
+WAGTAIL_JEV_BACKEND = "clef"
+WAGTAIL_JEV_CLEF_ACCOUNT_ID = "your-account-id"   # or the CLOUDFLARE_ACCOUNT_ID environment variable
+WAGTAIL_JEV_CLEF_API_TOKEN = "your-api-token"     # or the CLOUDFLARE_API_TOKEN environment variable
+```
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `WAGTAIL_JEV_CLEF_ACCOUNT_ID` | `None` | Your Cloudflare account ID. If unset, the `CLOUDFLARE_ACCOUNT_ID` environment variable is used |
+| `WAGTAIL_JEV_CLEF_API_TOKEN` | `None` | A Cloudflare API token with Workers AI permission. If unset, the `CLOUDFLARE_API_TOKEN` environment variable is used |
+| `WAGTAIL_JEV_CLEF_MODEL` | `"clef"` | `"clef"`, or `"clef-flash"` for the smaller, faster variant |
+
+`WAGTAIL_JEV_TIMEOUT` also applies to Clef. `WAGTAIL_JEV_API_KEY` and `WAGTAIL_JEV_MODEL`
+are for Jev only. Workers AI accepts at most 64 questions per request, so keep
+`WAGTAIL_JEV_BATCH_SIZE` at 64 or below (the default is 40).
+
+Clef starts from Jev's prompt, state and `WAGTAIL_JEV_MAX_CHARS`. They have not been tuned
+for Clef, so check its suggestions and Ratings on your own pages first (see "Tuning").
+
 ## Development
 
 Install the package in a virtualenv and run the tests:
@@ -449,5 +477,7 @@ Add `--live` to use the real Jev. The script reads the API key from `WAGTAIL_API
 or `TYPESAFE_API_KEY` in your `.env` file.
 
 Add `--laya` to use Laya in the same process (needs `pip install -e ".[laya,test]"`), or
-`--laya-url http://127.0.0.1:8000` to use a running `python -m laya.serve`. `--port 8766`
-serves the admin on another port.
+`--laya-url http://127.0.0.1:8000` to use a running `python -m laya.serve`. Add `--clef`
+to use Clef on Workers AI; the script reads `CLOUDFLARE_ACCOUNT_ID` and
+`CLOUDFLARE_API_TOKEN` from your `.env` file. `--port 8766` serves the admin on another
+port.

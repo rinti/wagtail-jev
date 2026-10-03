@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "wagtail>=6.3",
     "typesafe-sdk>=0.7",
+    "httpx2>=2.0.0",
 ]
 
 [project.optional-dependencies]

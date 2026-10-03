@@ -22,7 +22,7 @@ def test_an_unknown_backend_names_the_allowed_values(settings):
         get_profile()
 
 
-@pytest.mark.parametrize("backend", ["jev", "laya"])
+@pytest.mark.parametrize("backend", ["jev", "laya", "clef"])
 def test_settings_override_the_model_defaults(settings, backend):
     settings.WAGTAIL_JEV_BACKEND = backend
     settings.WAGTAIL_JEV_MAX_CHARS = 5
@@ -67,7 +67,22 @@ def test_laya_without_a_url_runs_in_process(settings):
     assert get_client().url is None
 
 
-@pytest.mark.parametrize("backend", ["jev", "laya"])
+def test_clef_opens_a_client_from_the_clef_settings(settings, monkeypatch):
+    opened = {}
+    monkeypatch.setattr("wagtail_jev.clef.make_client", lambda **config: opened.update(config))
+    settings.WAGTAIL_JEV_BACKEND = "clef"
+    settings.WAGTAIL_JEV_CLEF_ACCOUNT_ID = "from-settings"
+    settings.WAGTAIL_JEV_CLEF_MODEL = "clef-flash"
+    settings.WAGTAIL_JEV_TIMEOUT = 7.0
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "account-from-env")
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "token-from-env")
+
+    get_client()
+
+    assert opened == {"account_id": "from-settings", "api_token": "token-from-env", "model": "clef-flash", "timeout": 7.0}
+
+
+@pytest.mark.parametrize("backend", ["jev", "laya", "clef"])
 def test_an_explicit_none_max_chars_still_means_no_cut_off(settings, backend):
     # At 40d4f23 `clip()` did text[:None], so None meant "send the whole page"; keep that.
     from wagtail_jev.client import clip
