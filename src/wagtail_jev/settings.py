@@ -3,8 +3,8 @@
 from django.conf import settings
 
 DEFAULTS = {
-    # Which decision model answers: "jev" (TypeSafe's hosted Jev), "laya" (open source, runs locally)
-    # or "clef" (Cloudflare's Clef, hosted on Workers AI).
+    # Which decision model answers: "jev" (TypeSafe's hosted Jev), "laya" (open source, runs locally),
+    # "clef" (Cloudflare's Clef, hosted on Workers AI) or "openai" (OpenAI's Decisions API).
     "WAGTAIL_JEV_BACKEND": "jev",
     # Base URL of a Laya server (`python -m laya.serve`). Unset means Laya runs in this process.
     "WAGTAIL_JEV_LAYA_URL": None,
@@ -18,6 +18,12 @@ DEFAULTS = {
     "WAGTAIL_JEV_CLEF_API_TOKEN": None,
     # "clef", or "clef-flash" for the smaller, faster variant.
     "WAGTAIL_JEV_CLEF_MODEL": "clef",
+    # OpenAI API key. Falls back to the OPENAI_API_KEY environment variable.
+    "WAGTAIL_JEV_OPENAI_API_KEY": None,
+    # Model for OpenAI's Decisions API; "gpt-6-luna" is the only one so far.
+    "WAGTAIL_JEV_OPENAI_MODEL": "gpt-6-luna",
+    # OpenAI's API root, e.g. "https://eu.api.openai.com/v1" for European data residency.
+    "WAGTAIL_JEV_OPENAI_BASE_URL": "https://api.openai.com/v1",
     # TypeSafe API key. Falls back to the TYPESAFE_API_KEY environment variable.
     "WAGTAIL_JEV_API_KEY": None,
     # Model sent with every request. Pin a versioned ID once thresholds are tuned.
@@ -26,8 +32,8 @@ DEFAULTS = {
     "WAGTAIL_JEV_THRESHOLD": 0.6,
     # Upper bound on suggestions returned per page. None means no cap.
     "WAGTAIL_JEV_MAX_TAGS": None,
-    # Characters of page text sent as state. Unset means the model's default (Jev and Clef
-    # 12000, Laya 2000); None means no cut-off.
+    # Characters of page text sent as state. Unset means the model's default (Jev, Clef and
+    # OpenAI 12000, Laya 2000); None means no cut-off.
     "WAGTAIL_JEV_MAX_CHARS": None,
     # Candidate tags per request. Each tag is one question; questions share the 64k budget.
     "WAGTAIL_JEV_BATCH_SIZE": 40,
@@ -40,7 +46,7 @@ DEFAULTS = {
     # Prompt templates. ``{tag}`` is replaced with the candidate tag name. Unset means the
     # model's default (see wagtail_jev.profiles): Jev and Clef read the article under the
     # `article` state key (with `article.title` and `article.body`) and current tags under
-    # `existing_tags`; Laya reads the page as plain text, which it calls `state`.
+    # `existing_tags`; Laya and OpenAI read the page as plain text, which Laya calls `state`.
     "WAGTAIL_JEV_INSTRUCTIONS": None,
     "WAGTAIL_JEV_CRITERIA_TRUE": None,
     "WAGTAIL_JEV_CRITERIA_FALSE": None,

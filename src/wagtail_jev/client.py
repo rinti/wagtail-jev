@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_client() -> TypeSafeClient:
-    """A client for the model ``WAGTAIL_JEV_BACKEND`` names: a ``TypeSafeClient`` for Jev,
-    a :class:`~wagtail_jev.laya.LayaClient` with the same surface for Laya."""
+    """A client for the model ``WAGTAIL_JEV_BACKEND`` names: a ``TypeSafeClient`` for Jev and
+    Clef, or one with the same surface for Laya (:class:`~wagtail_jev.laya.LayaClient`) and
+    OpenAI (:class:`~wagtail_jev.decisions.DecisionsClient`)."""
     return get_profile().make_client()
 
 

@@ -5,6 +5,7 @@
     python tests/manual_e2e.py --laya                             # real Laya in this process
     python tests/manual_e2e.py --laya-url http://127.0.0.1:8000   # a running `python -m laya.serve`
     python tests/manual_e2e.py --clef   # Clef on Workers AI; reads CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN from .env
+    python tests/manual_e2e.py --openai # OpenAI's Decisions API; reads OPENAI_API_KEY from .env
     python tests/manual_e2e.py --port 8766                        # serve the admin on another port
 
 Prints the Ratings of the seeded page on every declared Quality, then serves the admin.
@@ -20,6 +21,7 @@ LIVE = "--live" in sys.argv
 LAYA_URL = sys.argv[sys.argv.index("--laya-url") + 1] if "--laya-url" in sys.argv else None
 LAYA = "--laya" in sys.argv or LAYA_URL is not None
 CLEF = "--clef" in sys.argv
+OPENAI = "--openai" in sys.argv
 PORT = sys.argv[sys.argv.index("--port") + 1] if "--port" in sys.argv else "8765"
 if LAYA:
     os.environ["WAGTAIL_JEV_BACKEND"] = "laya"
@@ -27,6 +29,8 @@ if LAYA:
         os.environ["WAGTAIL_JEV_LAYA_URL"] = LAYA_URL
 if CLEF:
     os.environ["WAGTAIL_JEV_BACKEND"] = "clef"
+if OPENAI:
+    os.environ["WAGTAIL_JEV_BACKEND"] = "openai"
 
 
 def load_dotenv(path=Path(".env")):
@@ -53,6 +57,11 @@ if CLEF:
     if missing:
         sys.exit(f"No {' or '.join(missing)} found in .env or environment")
 
+if OPENAI:
+    load_dotenv()
+    if not os.environ.get("OPENAI_API_KEY"):
+        sys.exit("No OPENAI_API_KEY found in .env or environment")
+
 os.environ["DJANGO_SETTINGS_MODULE"] = "tests.e2e_settings"
 import django  # noqa: E402
 
@@ -60,7 +69,7 @@ django.setup()
 
 from django.core.management import call_command, execute_from_command_line  # noqa: E402
 
-if not LIVE and not LAYA and not CLEF:
+if not LIVE and not LAYA and not CLEF and not OPENAI:
     import wagtail_jev.client as jev_client
     from tests.conftest import FakeClient
 
@@ -99,7 +108,8 @@ page = root.add_child(
 print(
     "Mode:",
     f"Laya server at {LAYA_URL}" if LAYA_URL else "Laya in this process" if LAYA
-    else "Clef on Workers AI" if CLEF else "LIVE Jev" if LIVE else "stubbed Jev",
+    else "Clef on Workers AI" if CLEF else "OpenAI's Decisions API" if OPENAI
+    else "LIVE Jev" if LIVE else "stubbed Jev",
 )
 print("Ratings for", repr(page.title))
 for rating in page.jev_rate():

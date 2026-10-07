@@ -14,6 +14,9 @@ same kind of state.
 
 Clef takes Jev's requests unchanged, so it starts from Jev's prompt, state and quoting.
 
+OpenAI's Decisions API reads plain text, so it gets Laya's state, and a prompt about "this
+article" instead of Jev's `article` key. It keeps Jev's quoting and text cut-off.
+
 This is internal for now: the seam a public model interface can grow from.
 """
 
@@ -71,11 +74,22 @@ def _clef_client():
     )
 
 
+def _openai_client():
+    from wagtail_jev.decisions import DecisionsClient
+
+    return DecisionsClient(
+        api_key=get_setting("WAGTAIL_JEV_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY"),
+        model=get_setting("WAGTAIL_JEV_OPENAI_MODEL"),
+        base_url=get_setting("WAGTAIL_JEV_OPENAI_BASE_URL"),
+        timeout=get_setting("WAGTAIL_JEV_TIMEOUT"),
+    )
+
+
 def _jev_tag_state(article, body: str) -> dict:
     return {"article": {"title": article.title, "body": body}, "existing_tags": list(article.existing_tags)}
 
 
-def _laya_tag_state(article, body: str) -> str:
+def _text_tag_state(article, body: str) -> str:
     return f"{article.title}\n\n{body}"
 
 
@@ -85,7 +99,7 @@ def _jev_rating_state(title: str | None, text: str) -> dict:
     return {"article": {"title": title, "body": text}}
 
 
-def _laya_rating_state(title: str | None, text: str) -> str:
+def _text_rating_state(title: str | None, text: str) -> str:
     return text if title is None else f"{title}\n\n{text}"
 
 
@@ -115,8 +129,8 @@ LAYA = ModelProfile(
         "WAGTAIL_JEV_CRITERIA_TRUE": "about {tag}",
         "WAGTAIL_JEV_CRITERIA_FALSE": "not about {tag}",
     },
-    tag_state=_laya_tag_state,
-    rating_state=_laya_rating_state,
+    tag_state=_text_tag_state,
+    rating_state=_text_rating_state,
     quote_tags=False,
     slow_start=True,
 )
@@ -130,7 +144,24 @@ CLEF = ModelProfile(
     quote_tags=True,
 )
 
-PROFILES = {"jev": JEV, "laya": LAYA, "clef": CLEF}
+OPENAI = ModelProfile(
+    name="OpenAI",
+    make_client=_openai_client,
+    defaults={
+        "WAGTAIL_JEV_MAX_CHARS": 12000,
+        "WAGTAIL_JEV_INSTRUCTIONS": (
+            "Would an editor file this article under the tag {tag}? "
+            "Judge by the article's actual subject matter, not by incidental mentions."
+        ),
+        "WAGTAIL_JEV_CRITERIA_TRUE": JEV.defaults["WAGTAIL_JEV_CRITERIA_TRUE"],
+        "WAGTAIL_JEV_CRITERIA_FALSE": JEV.defaults["WAGTAIL_JEV_CRITERIA_FALSE"],
+    },
+    tag_state=_text_tag_state,
+    rating_state=_text_rating_state,
+    quote_tags=True,
+)
+
+PROFILES = {"jev": JEV, "laya": LAYA, "clef": CLEF, "openai": OPENAI}
 
 
 def get_profile() -> ModelProfile:

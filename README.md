@@ -304,7 +304,7 @@ also be set per tag field, as shown in "Several tag fields" above.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `WAGTAIL_JEV_BACKEND` | `"jev"` | Which model answers: `"jev"`, `"laya"` or `"clef"`. See "Using Laya instead of Jev" and "Using Clef instead of Jev" |
+| `WAGTAIL_JEV_BACKEND` | `"jev"` | Which model answers: `"jev"`, `"laya"`, `"clef"` or `"openai"`. See "Using Laya instead of Jev", "Using Clef instead of Jev" and "Using OpenAI instead of Jev" |
 | `WAGTAIL_JEV_API_KEY` | `None` | Your TypeSafe API key. If unset, the `TYPESAFE_API_KEY` environment variable is used |
 | `WAGTAIL_JEV_MODEL` | `"jev-latest"` | Which Jev model to use. Pin a specific version once your threshold is tuned |
 | `WAGTAIL_JEV_THRESHOLD` | `0.6` | A tag is suggested only if its probability is at least this |
@@ -332,7 +332,8 @@ WAGTAIL_JEV_CRITERIA_TRUE = "The article is substantially about, or clearly belo
 WAGTAIL_JEV_CRITERIA_FALSE = "The topic {tag} is absent or only mentioned in passing."
 ```
 
-These are Jev's defaults, and Clef's. Laya has its own; see "Using Laya instead of Jev".
+These are Jev's defaults, and Clef's. Laya and OpenAI have their own; see "Using Laya
+instead of Jev" and "Using OpenAI instead of Jev".
 
 `{tag}` stands for the tag name. `article` is the page, with a `title` and a `body`.
 `existing_tags` lists the tags the page already has. You can use all three in your own
@@ -395,7 +396,7 @@ at 64 or below (the default is 40).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `WAGTAIL_JEV_BACKEND` | `"jev"` | `"jev"`, `"laya"` or `"clef"` |
+| `WAGTAIL_JEV_BACKEND` | `"jev"` | `"jev"`, `"laya"`, `"clef"` or `"openai"` |
 | `WAGTAIL_JEV_LAYA_URL` | `None` | A Laya server's base URL. If unset, Laya runs inside Django |
 | `WAGTAIL_JEV_LAYA_API_KEY` | `None` | The server's `LAYA_API_KEY`. If unset, the `LAYA_API_KEY` environment variable is used |
 | `WAGTAIL_JEV_LAYA_MODEL` | `None` | `"english"` or `"multilingual"`. If unset, Laya picks one per request by language |
@@ -453,6 +454,44 @@ are for Jev only. Workers AI accepts at most 64 questions per request, so keep
 Clef starts from Jev's prompt, state and `WAGTAIL_JEV_MAX_CHARS`. They have not been tuned
 for Clef, so check its suggestions and Ratings on your own pages first (see "Tuning").
 
+## Using OpenAI instead of Jev
+
+OpenAI's [Decisions API](https://developers.openai.com/api/docs/guides/decisions) answers
+the same kind of questions as Jev, with its `gpt-6-luna` model. Everything above works the
+same; the buttons say "OpenAI" instead of "Jev". You pay OpenAI instead of TypeSafe. The
+Decisions API is in public beta.
+
+You need an OpenAI API key:
+
+```python
+WAGTAIL_JEV_BACKEND = "openai"
+WAGTAIL_JEV_OPENAI_API_KEY = "sk-..."   # or the OPENAI_API_KEY environment variable
+```
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `WAGTAIL_JEV_OPENAI_API_KEY` | `None` | Your OpenAI API key. If unset, the `OPENAI_API_KEY` environment variable is used |
+| `WAGTAIL_JEV_OPENAI_MODEL` | `"gpt-6-luna"` | The Decisions model. `gpt-6-luna` is the only one so far |
+| `WAGTAIL_JEV_OPENAI_BASE_URL` | `"https://api.openai.com/v1"` | OpenAI's API address. Use `"https://eu.api.openai.com/v1"` for a project with European data residency |
+
+`WAGTAIL_JEV_TIMEOUT` also applies to OpenAI. `WAGTAIL_JEV_API_KEY` and `WAGTAIL_JEV_MODEL`
+are for Jev only.
+
+**OpenAI's requests differ from Jev's:**
+
+- the page is sent as plain text (title, blank line, body), as for Laya. Existing tags are
+  not sent;
+- the default question is "Would an editor file this article under the tag {tag}? …", since
+  there is no `article` key. The true and false criteria are Jev's;
+- the Decisions API has no yes/no criteria, so they are added to the question as a
+  "True: …" line and a "False: …" line;
+- a Rating's levels are labelled 0, 1, 2 and so on. OpenAI judges your level descriptions,
+  and never sees your labels.
+
+If OpenAI declines to answer a question, the whole request fails, and the error names the
+question. The defaults have not been tuned for OpenAI, so check its suggestions and Ratings
+on your own pages first (see "Tuning").
+
 ## Development
 
 Install the package in a virtualenv and run the tests:
@@ -479,5 +518,6 @@ or `TYPESAFE_API_KEY` in your `.env` file.
 Add `--laya` to use Laya in the same process (needs `pip install -e ".[laya,test]"`), or
 `--laya-url http://127.0.0.1:8000` to use a running `python -m laya.serve`. Add `--clef`
 to use Clef on Workers AI; the script reads `CLOUDFLARE_ACCOUNT_ID` and
-`CLOUDFLARE_API_TOKEN` from your `.env` file. `--port 8766` serves the admin on another
-port.
+`CLOUDFLARE_API_TOKEN` from your `.env` file. Add `--openai` to use OpenAI's Decisions API;
+the script reads `OPENAI_API_KEY` from your `.env` file. `--port 8766` serves the admin on
+another port.

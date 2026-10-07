@@ -22,7 +22,7 @@ def test_an_unknown_backend_names_the_allowed_values(settings):
         get_profile()
 
 
-@pytest.mark.parametrize("backend", ["jev", "laya", "clef"])
+@pytest.mark.parametrize("backend", ["jev", "laya", "clef", "openai"])
 def test_settings_override_the_model_defaults(settings, backend):
     settings.WAGTAIL_JEV_BACKEND = backend
     settings.WAGTAIL_JEV_MAX_CHARS = 5
@@ -82,7 +82,23 @@ def test_clef_opens_a_client_from_the_clef_settings(settings, monkeypatch):
     assert opened == {"account_id": "from-settings", "api_token": "token-from-env", "model": "clef-flash", "timeout": 7.0}
 
 
-@pytest.mark.parametrize("backend", ["jev", "laya", "clef"])
+def test_openai_opens_a_decisions_client_from_the_openai_settings(settings, monkeypatch):
+    opened = {}
+    monkeypatch.setattr("wagtail_jev.decisions.DecisionsClient", lambda **config: opened.update(config))
+    settings.WAGTAIL_JEV_BACKEND = "openai"
+    settings.WAGTAIL_JEV_OPENAI_BASE_URL = "https://eu.api.openai.com/v1"
+    settings.WAGTAIL_JEV_TIMEOUT = 7.0
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-from-env")
+
+    get_client()
+
+    assert opened == {
+        "api_key": "sk-from-env", "model": "gpt-6-luna", "base_url": "https://eu.api.openai.com/v1", "timeout": 7.0,
+    }
+
+
+
+@pytest.mark.parametrize("backend", ["jev", "laya", "clef", "openai"])
 def test_an_explicit_none_max_chars_still_means_no_cut_off(settings, backend):
     # At 40d4f23 `clip()` did text[:None], so None meant "send the whole page"; keep that.
     from wagtail_jev.client import clip

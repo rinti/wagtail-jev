@@ -182,6 +182,20 @@ def test_laya_gets_plain_text_state_unquoted_tags_and_its_own_prompt(fake_client
     assert question.criteria == {"true": "about python", "false": "not about python"}
 
 
+def test_openai_gets_plain_text_state_quoted_tags_and_a_prompt_without_jevs_state_keys(fake_client, settings):
+    settings.WAGTAIL_JEV_BACKEND = "openai"
+    client = fake_client({"python": 0.9})
+    article = Article(title="Django ORM tips", body="select_related", existing_tags=("orm",))
+
+    JevTagField(candidates=lambda: ["python"]).bind(ArticlePage, "tags").score(article)
+
+    state, questions = client.calls[0]
+    assert state == "Django ORM tips\n\nselect_related"
+    question = questions["tag_0"]
+    assert "'python'" in question.instructions
+    assert "`article`" not in question.instructions
+
+
 def test_jev_still_gets_the_dict_state_and_quoted_tags(fake_client):
     client = fake_client({"python": 0.9})
     JevTagField(candidates=lambda: ["python"]).bind(ArticlePage, "tags").score(ARTICLE)
